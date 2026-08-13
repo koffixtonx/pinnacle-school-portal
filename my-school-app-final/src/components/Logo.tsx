@@ -1,5 +1,5 @@
 import Box from '@mui/material/Box';
-import pinnacleLogo from '../assets/pinnacle-logo.svg';
+import pinnacleLogo from '../assets/pinnacle-logo.png';
 
 interface LogoProps {
   size?: number;
