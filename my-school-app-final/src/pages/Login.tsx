@@ -23,6 +23,7 @@ const DEMO_ACCOUNTS: { label: string; role: string; email: string; password: str
   { label: 'Super Admin', role: 'SUPER_ADMIN', email: 'admin@pinnacle.school', password: 'AdminPass!234' },
   { label: 'Teacher', role: 'TEACHER', email: 'teacher@pinnacle.school', password: 'TeacherPass!234' },
   { label: 'Student', role: 'STUDENT', email: 'student@pinnacle.school', password: 'StudentPass!234' },
+  { label: 'Staff', role: 'NON_ACADEMIC_STAFF', email: 'staff1@pinnacle.test', password: 'StaffPass!234' },
 ];
 
 const Login: React.FC = () => {
@@ -32,6 +33,12 @@ const Login: React.FC = () => {
   const [email, setEmail] = useState('');
   const [password, setPassword] = useState('');
   const [quickLoginRole, setQuickLoginRole] = useState<string | null>(null);
+
+  const getPostLoginPath = (role?: string) => {
+    // Direct users to the welcome page after login so the dashboard is not used as a landing screen.
+    if (role === 'NON_ACADEMIC_STAFF') return '/';
+    return '/';
+  };
 
   const performLogin = async (loginEmail: string, loginPassword: string) => {
     setError('');
@@ -46,12 +53,7 @@ const Login: React.FC = () => {
       localStorage.setItem('user', JSON.stringify(user));
       window.dispatchEvent(new Event('pinnacle-auth-change'));
 
-      // Redirect based on role
-      if (user.role === 'SUPER_ADMIN' || user.role === 'SCHOOL_ADMIN') {
-        navigate('/dashboard');
-      } else {
-        navigate('/');
-      }
+      navigate(getPostLoginPath(user.role));
     } catch (err: any) {
       setError(err.response?.data?.message || 'Login failed. Please try again.');
     } finally {

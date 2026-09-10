@@ -25,6 +25,10 @@ img {
   display: block;
 }
 
+.MuiTableContainer-root {
+  overflow-x: auto;
+}
+
 button,
 input,
 textarea,

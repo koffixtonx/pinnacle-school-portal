@@ -4,6 +4,44 @@ import prisma from '../prisma.js';
 
 const router = Router();
 
+router.get('/', authenticate, verifyTenantAccess, async (req, res) => {
+  const tenantId = req.auth!.tenantId;
+  const notifications = await prisma.notification.findMany({
+    where: { tenantId },
+    orderBy: { createdAt: 'desc' },
+    take: 20,
+  });
+
+  res.json({ success: true, data: notifications });
+});
+
+router.patch('/read-all', authenticate, verifyTenantAccess, async (req, res) => {
+  await prisma.notification.updateMany({
+    where: { tenantId: req.auth!.tenantId },
+    data: { readBy: req.auth!.userId },
+  });
+
+  res.json({ success: true });
+});
+
+router.patch('/:id/read', authenticate, verifyTenantAccess, async (req, res) => {
+  const notification = await prisma.notification.updateMany({
+    where: {
+      id: req.params.id,
+      tenantId: req.auth!.tenantId,
+    },
+    data: {
+      readBy: req.auth!.userId,
+    },
+  });
+
+  if (notification.count === 0) {
+    return res.status(404).json({ success: false, message: 'Notification not found.' });
+  }
+
+  res.json({ success: true });
+});
+
 router.get('/stream', authenticate, verifyTenantAccess, async (req, res) => {
   const tenantId = req.auth!.tenantId;
   res.set({

@@ -22,23 +22,45 @@ import {
   DialogTitle,
   DialogContent,
   DialogActions,
+  Alert,
+  CircularProgress,
 } from '@mui/material';
 import EditIcon from '@mui/icons-material/Edit';
 import SaveIcon from '@mui/icons-material/Save';
 import PasswordIcon from '@mui/icons-material/Password';
 import BugReportIcon from '@mui/icons-material/BugReport';
 import HelpIcon from '@mui/icons-material/Help';
+import { authService } from '../services/api.service';
+import { useCurrentUser } from '../hooks/useCurrentUser';
 
 const Settings: React.FC = () => {
+  const currentUser = useCurrentUser();
   const [editMode, setEditMode] = React.useState(false);
+  const [savingProfile, setSavingProfile] = React.useState(false);
+  const [profileMessage, setProfileMessage] = React.useState<{ severity: 'success' | 'error'; text: string } | null>(null);
   const [passwordDialog, setPasswordDialog] = React.useState(false);
   const [formData, setFormData] = React.useState({
-    fullName: 'Adeola Ogunleye',
-    email: 'admin@pinnacleuniversity.edu',
-    phone: '+234 803 000 1234',
+    fullName: [currentUser?.firstName, currentUser?.lastName].filter(Boolean).join(' ') || '',
+    email: currentUser?.email || '',
+    phone: currentUser?.phone || '',
     schoolName: 'Pinnacle University',
     position: 'Administrative Head',
   });
+
+  React.useEffect(() => {
+    setFormData((previous) => ({
+      ...previous,
+      fullName: [currentUser?.firstName, currentUser?.lastName].filter(Boolean).join(' '),
+      email: currentUser?.email || '',
+      phone: currentUser?.phone || '',
+    }));
+  }, [currentUser?.email, currentUser?.firstName, currentUser?.lastName, currentUser?.phone]);
+
+  const originalProfile = {
+    fullName: [currentUser?.firstName, currentUser?.lastName].filter(Boolean).join(' '),
+    phone: currentUser?.phone || '',
+  };
+  const profileChanged = formData.fullName.trim() !== originalProfile.fullName || formData.phone.trim() !== originalProfile.phone;
 
   const [settings, setSettings] = React.useState({
     emailNotifications: true,
@@ -58,6 +80,23 @@ const Settings: React.FC = () => {
     setSettings((prev) => ({ ...prev, [key]: !prev[key] }));
   };
 
+  const handleProfileSave = async () => {
+    setSavingProfile(true);
+    setProfileMessage(null);
+    try {
+      const response = await authService.updateProfile(formData.fullName, formData.phone);
+      const updatedUser = response.data.user;
+      localStorage.setItem('user', JSON.stringify(updatedUser));
+      window.dispatchEvent(new Event('pinnacle-auth-change'));
+      setEditMode(false);
+      setProfileMessage({ severity: 'success', text: 'Your profile was updated successfully.' });
+    } catch (error: any) {
+      setProfileMessage({ severity: 'error', text: error.response?.data?.message || 'Unable to update your profile. Please try again.' });
+    } finally {
+      setSavingProfile(false);
+    }
+  };
+
   return (
     <Box>
       <Typography variant="h4" sx={{ fontWeight: 700, mb: 3 }}>
@@ -66,7 +105,7 @@ const Settings: React.FC = () => {
 
       <Grid container spacing={3}>
         {/* Profile Section */}
-        <Grid item xs={12} md={6}>
+        <Grid xs={12} md={6}>
           <Card>
             <CardHeader
               title="Profile Information"
@@ -107,8 +146,7 @@ const Settings: React.FC = () => {
                 name="email"
                 type="email"
                 value={formData.email}
-                onChange={handleInputChange}
-                disabled={!editMode}
+                disabled
                 margin="normal"
                 variant={editMode ? 'outlined' : 'filled'}
               />
@@ -129,8 +167,7 @@ const Settings: React.FC = () => {
                 label="Position"
                 name="position"
                 value={formData.position}
-                onChange={handleInputChange}
-                disabled={!editMode}
+                disabled
                 margin="normal"
                 variant={editMode ? 'outlined' : 'filled'}
               />
@@ -140,19 +177,23 @@ const Settings: React.FC = () => {
                 label="School Name"
                 name="schoolName"
                 value={formData.schoolName}
-                onChange={handleInputChange}
-                disabled={!editMode}
+                disabled
                 margin="normal"
                 variant={editMode ? 'outlined' : 'filled'}
               />
+
+              {profileMessage && <Alert severity={profileMessage.severity} sx={{ mt: 2 }}>{profileMessage.text}</Alert>}
 
               {editMode && (
                 <Button
                   variant="contained"
                   fullWidth
                   sx={{ mt: 3 }}
+                  disabled={!profileChanged || savingProfile}
+                  onClick={() => void handleProfileSave()}
+                  startIcon={savingProfile ? <CircularProgress size={18} color="inherit" /> : <SaveIcon />}
                 >
-                  Save Changes
+                  {savingProfile ? 'Saving...' : 'Save Changes'}
                 </Button>
               )}
             </CardContent>
@@ -160,7 +201,7 @@ const Settings: React.FC = () => {
         </Grid>
 
         {/* Security & Preferences */}
-        <Grid item xs={12} md={6}>
+        <Grid xs={12} md={6}>
           <Card>
             <CardHeader title="Security & Preferences" />
             <Divider />
@@ -249,7 +290,7 @@ const Settings: React.FC = () => {
         </Grid>
 
         {/* Support & Help */}
-        <Grid item xs={12}>
+        <Grid xs={12}>
           <Card>
             <CardHeader title="Support & Help" />
             <Divider />

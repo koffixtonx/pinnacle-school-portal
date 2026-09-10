@@ -11,6 +11,7 @@ router.use(authenticate, verifyTenantAccess);
 // stricter admin-only gate below.
 router.get('/students', authorize('SUPER_ADMIN', 'SCHOOL_ADMIN', 'TEACHER'), AdminController.listStudents);
 router.get('/teachers', authorize('SUPER_ADMIN', 'SCHOOL_ADMIN', 'TEACHER'), AdminController.listTeachers);
+router.put('/students/:id', authorize('SUPER_ADMIN', 'SCHOOL_ADMIN', 'TEACHER'), AdminController.updateStudent);
 
 // Everything else (analytics, bulk import, audit log) is admin-only.
 router.use(authorize('SUPER_ADMIN', 'SCHOOL_ADMIN'));
@@ -27,7 +28,10 @@ router.put('/teachers/:id', AdminController.updateTeacher);
 router.delete('/teachers/:id', AdminController.deleteTeacher);
 
 router.post('/students', AdminController.createStudent);
-router.put('/students/:id', AdminController.updateStudent);
 router.delete('/students/:id', AdminController.deleteStudent);
+router.get('/faculties', AdminController.listFaculties);
+router.post('/faculties', AdminController.createFaculty);
+router.get('/departments', AdminController.listDepartments);
+router.post('/departments', AdminController.createDepartment);
 
 export { router as adminRouter };

@@ -52,7 +52,13 @@ const Home: React.FC = () => {
   const [activeSlide, setActiveSlide] = React.useState(0);
   const navigate = useNavigate();
   const currentUser = useCurrentUser();
-  const isAuthenticated = Boolean(currentUser);
+  const isAuthenticated = Boolean(currentUser && localStorage.getItem('accessToken'));
+
+  React.useEffect(() => {
+    if (isAuthenticated && currentUser) {
+      navigate('/', { replace: true });
+    }
+  }, [currentUser, isAuthenticated, navigate]);
 
   React.useEffect(() => {
     const timer = window.setInterval(() => {
@@ -85,7 +91,10 @@ const Home: React.FC = () => {
 
   const currentSlide = slides[activeSlide];
   const [logoSrc, setLogoSrc] = React.useState<string | null>(pinnacleLogo);
-  const [heroOverride, setHeroOverride] = React.useState<string | null>(null);
+  const [welcomeMessage, setWelcomeMessage] = React.useState<string | null>(null);
+  const [welcomeMessageColor, setWelcomeMessageColor] = React.useState('#f2d675');
+  const [welcomeBackgrounds, setWelcomeBackgrounds] = React.useState<string[]>([]);
+  const [activeBackground, setActiveBackground] = React.useState(0);
   const apiBaseUrl = import.meta.env.VITE_API_BASE_URL ? String(import.meta.env.VITE_API_BASE_URL).replace(/\/api$/, '') : 'http://localhost:5000';
 
   const resolveAssetUrl = (path: string) => {
@@ -99,10 +108,26 @@ const Home: React.FC = () => {
       if (!mounted) return;
       const data = res.data.data;
       if (data?.logoPath) setLogoSrc(data.logoPath);
-      if (data?.heroImagePath) setHeroOverride(data.heroImagePath);
+      if (typeof data?.welcomeMessage === 'string' && data.welcomeMessage.trim()) {
+        setWelcomeMessage(data.welcomeMessage.trim());
+      } else {
+        setWelcomeMessage(null);
+      }
+      setWelcomeMessageColor(data?.welcomeMessageColor || '#f2d675');
+      if (Array.isArray(data?.welcomeBackgroundImages)) setWelcomeBackgrounds(data.welcomeBackgroundImages);
     }).catch(() => {});
     return () => { mounted = false; };
   }, []);
+
+  const resolvedBackgrounds = welcomeBackgrounds.map(resolveAssetUrl);
+
+  React.useEffect(() => {
+    if (resolvedBackgrounds.length < 2) return undefined;
+    const nextImage = new Image();
+    nextImage.src = resolvedBackgrounds[(activeBackground + 1) % resolvedBackgrounds.length];
+    const timer = window.setInterval(() => setActiveBackground((current) => (current + 1) % resolvedBackgrounds.length), 6000);
+    return () => window.clearInterval(timer);
+  }, [activeBackground, resolvedBackgrounds]);
 
   return (
     <Box sx={{ pb: 5 }}>
@@ -116,14 +141,15 @@ const Home: React.FC = () => {
           color: 'common.white',
           border: '1px solid rgba(255,255,255,0.18)',
           boxShadow: '0 28px 70px rgba(8,34,60,0.22)',
-          backgroundImage: `linear-gradient(90deg, rgba(8, 34, 60, 0.92), rgba(18, 53, 91, 0.64) 54%, rgba(8, 34, 60, 0.3)), url(${resolveAssetUrl(heroOverride || currentSlide.image)})`,
-          backgroundPosition: 'center',
-          backgroundSize: 'cover',
-          transition: 'background-image 450ms ease',
+          bgcolor: '#08223c',
         }}
       >
+        {resolvedBackgrounds.map((image, index) => <Box key={image} sx={{ position: 'absolute', inset: 0, backgroundImage: `url(${image})`, backgroundPosition: 'center', backgroundSize: 'cover', opacity: index === activeBackground ? 1 : 0, transition: 'opacity 1100ms ease-in-out' }} />)}
+        <Box sx={{ position: 'absolute', inset: 0, background: 'linear-gradient(90deg, rgba(8, 34, 60, 0.92), rgba(18, 53, 91, 0.64) 54%, rgba(8, 34, 60, 0.3))' }} />
         <Box
           sx={{
+            position: 'relative',
+            zIndex: 1,
             minHeight: { xs: 560, md: 640 },
             display: 'flex',
             flexDirection: 'column',
@@ -152,16 +178,16 @@ const Home: React.FC = () => {
             />
             <Box>
               <Chip
-                label="Reach Your Peak"
+                label={welcomeMessage ? 'Featured Message' : 'Reach Your Peak'}
                 sx={{
                   mb: 1,
                   color: '#08223c',
-                  bgcolor: '#f2d675',
+                  bgcolor: welcomeMessageColor,
                   fontWeight: 700,
                 }}
               />
-              <Typography variant="h3" component="h1" sx={{ fontWeight: 900, lineHeight: 1.05, maxWidth: 720, letterSpacing: 0 }}>
-                Welcome to Pinnacle University
+              <Typography variant="h3" component="h1" sx={{ fontWeight: 900, lineHeight: 1.05, maxWidth: 720, letterSpacing: 0, color: welcomeMessage ? welcomeMessageColor : 'common.white' }}>
+                {welcomeMessage || 'Welcome to Pinnacle University'}
               </Typography>
             </Box>
           </Stack>
@@ -174,7 +200,7 @@ const Home: React.FC = () => {
               {currentSlide.caption}
             </Typography>
             <Stack direction={{ xs: 'column', sm: 'row' }} spacing={1.5}>
-              <Button component={RouterLink} to={isAuthenticated ? '/dashboard' : '/login'} variant="contained" color="secondary" size="large" sx={{ color: '#08223c' }}>
+              <Button component={RouterLink} to={isAuthenticated ? getRoleDashboardPath(currentUser?.role) : '/login'} variant="contained" color="secondary" size="large" sx={{ color: '#08223c' }}>
                 {isAuthenticated ? 'Open Dashboard' : 'Get Started'}
               </Button>
               {isAuthenticated ? (
@@ -224,7 +250,7 @@ const Home: React.FC = () => {
 
       <Grid container spacing={3} sx={{ mt: 3 }}>
         {highlights.map((item) => (
-          <Grid key={item.label} item xs={12} sm={6} md={3}>
+          <Grid key={item.label} xs={12} sm={6} md={3}>
             <Card sx={{ height: '100%', borderTop: '3px solid', borderColor: 'secondary.main' }}>
               <CardContent sx={{ display: 'flex', alignItems: 'center', gap: 2 }}>
                 <Box
@@ -253,7 +279,7 @@ const Home: React.FC = () => {
       </Grid>
 
       <Grid container spacing={3} sx={{ mt: 1 }}>
-        <Grid item xs={12} md={7}>
+        <Grid xs={12} md={7}>
           <Card sx={{ height: '100%' }}>
             <CardContent sx={{ p: { xs: 3, md: 4 } }}>
               <Typography variant="h5" sx={{ fontWeight: 800, mb: 2 }}>
@@ -268,7 +294,7 @@ const Home: React.FC = () => {
           </Card>
         </Grid>
 
-        <Grid item xs={12} md={5}>
+        <Grid xs={12} md={5}>
           <Card sx={{ height: '100%' }}>
             <CardContent sx={{ p: { xs: 3, md: 4 } }}>
               <Typography variant="h5" sx={{ fontWeight: 800, mb: 2 }}>

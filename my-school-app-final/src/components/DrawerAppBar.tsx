@@ -42,9 +42,19 @@ import Menu from '@mui/material/Menu';
 import MenuItem from '@mui/material/MenuItem';
 import Switch from '@mui/material/Switch';
 import Tooltip from '@mui/material/Tooltip';
-import { authService } from '../services/api.service';
+import { authService, notificationsService } from '../services/api.service';
 import { styled, alpha } from '@mui/material/styles';
 import { useNavigate } from 'react-router-dom';
+
+interface NotificationItem {
+  id: string;
+  title: string;
+  message: string;
+  category?: string;
+  level?: string;
+  createdAt: string;
+  readBy?: string | null;
+}
 
 interface Props {
   window?: () => Window;
@@ -104,6 +114,20 @@ const navItems: { label: string; description: string; to: string; icon: React.Re
     roles: ['SUPER_ADMIN', 'SCHOOL_ADMIN'],
   },
   {
+    label: 'Dashboard',
+    description: 'Go to your teacher dashboard',
+    to: '/teacher-dashboard',
+    icon: <DashboardIcon />,
+    roles: ['TEACHER'],
+  },
+  {
+    label: 'Dashboard',
+    description: 'Go to your student dashboard',
+    to: '/student-dashboard',
+    icon: <DashboardIcon />,
+    roles: ['STUDENT'],
+  },
+  {
     label: 'Students',
     description: 'View students',
     to: '/students',
@@ -117,8 +141,16 @@ const navItems: { label: string; description: string; to: string; icon: React.Re
     icon: <SchoolIcon />,
     roles: ['SUPER_ADMIN', 'SCHOOL_ADMIN'],
   },
+  {
+    label: 'Departments',
+    description: 'Manage faculties and departments',
+    to: '/departments',
+    icon: <SchoolIcon />,
+    roles: ['SUPER_ADMIN', 'SCHOOL_ADMIN'],
+  },
   { label: 'Timetable', description: 'Open timetable', to: '/timetable', icon: <EventNoteIcon /> },
   { label: 'Courses', description: 'Browse courses', to: '/courses', icon: <MenuBookIcon /> },
+  { label: 'Course Catalogue', description: 'Browse faculty course hierarchy', to: '/course-catalog', icon: <MenuBookIcon /> },
   { label: 'Attendance', description: 'Track attendance', to: '/attendance', icon: <EventAvailableIcon /> },
   { label: 'Grades', description: 'View and enter grades', to: '/grades', icon: <GradeIcon /> },
   {
@@ -148,9 +180,46 @@ export default function DrawerAppBar(props: Props) {
   const { window, children, mode = 'light', onToggleColorMode } = props;
   const [mobileOpen, setMobileOpen] = React.useState(false);
   const [profileAnchor, setProfileAnchor] = React.useState<null | HTMLElement>(null);
+  const [notificationAnchor, setNotificationAnchor] = React.useState<null | HTMLElement>(null);
+  const [notifications, setNotifications] = React.useState<NotificationItem[]>([]);
   const location = useLocation();
   const navigate = useNavigate();
   const currentYear = new Date().getFullYear();
+
+  const currentUser = useCurrentUser();
+  const isAuthenticated = Boolean(currentUser);
+  const unreadNotifications = notifications.filter((item) => !item.readBy || item.readBy !== currentUser?.id).length;
+
+  React.useEffect(() => {
+    if (!isAuthenticated) {
+      setNotifications([]);
+      return;
+    }
+
+    let cancelled = false;
+    const loadNotifications = async () => {
+      try {
+        const response = await notificationsService.list();
+        if (!cancelled) {
+          setNotifications(response.data?.data ?? []);
+        }
+      } catch (error) {
+        if (!cancelled) {
+          setNotifications([]);
+        }
+      }
+    };
+
+    void loadNotifications();
+    const intervalId = globalThis.setInterval(() => {
+      void loadNotifications();
+    }, 30000);
+
+    return () => {
+      cancelled = true;
+      globalThis.clearInterval(intervalId);
+    };
+  }, [isAuthenticated, currentUser?.id]);
 
   const handleDrawerToggle = () => {
     setMobileOpen((prevState) => !prevState);
@@ -158,6 +227,14 @@ export default function DrawerAppBar(props: Props) {
 
   const handleProfileMenu = (event: React.MouseEvent<HTMLElement>) => {
     setProfileAnchor(event.currentTarget);
+  };
+
+  const handleNotificationMenuOpen = (event: React.MouseEvent<HTMLElement>) => {
+    setNotificationAnchor(event.currentTarget);
+  };
+
+  const handleNotificationMenuClose = () => {
+    setNotificationAnchor(null);
   };
 
   const handleProfileClose = () => {
@@ -172,7 +249,7 @@ export default function DrawerAppBar(props: Props) {
     } finally {
       localStorage.removeItem('accessToken');
       localStorage.removeItem('user');
-      window.dispatchEvent(new Event('pinnacle-auth-change'));
+      globalThis.dispatchEvent(new Event('pinnacle-auth-change'));
       handleProfileClose();
       navigate('/login');
     }
@@ -183,9 +260,30 @@ export default function DrawerAppBar(props: Props) {
     navigate('/login');
   };
 
+  const handleNotificationRead = async (notificationId: string) => {
+    try {
+      await notificationsService.markRead(notificationId);
+      setNotifications((current) =>
+        current.map((item) =>
+          item.id === notificationId ? { ...item, readBy: currentUser?.id ?? item.readBy ?? 'read' } : item
+        )
+      );
+    } catch (error) {
+      console.error('Failed to mark notification as read', error);
+    }
+  };
+
+  const handleAllNotificationsRead = async () => {
+    try {
+      await notificationsService.markAllRead();
+      setNotifications((current) => current.map((item) => ({ ...item, readBy: currentUser?.id ?? item.readBy ?? 'read' })));
+    } catch (error) {
+      console.error('Failed to mark all notifications as read', error);
+    }
+  };
+
   const profileOpen = Boolean(profileAnchor);
-  const currentUser = useCurrentUser();
-  const isAuthenticated = Boolean(currentUser);
+  const notificationsOpen = Boolean(notificationAnchor);
   const visibleNavItems = React.useMemo(
     () => navItems.filter((item) => !item.roles || (currentUser && item.roles.includes(currentUser.role))),
     [currentUser]
@@ -227,7 +325,14 @@ export default function DrawerAppBar(props: Props) {
               }}
             >
               <ListItemIcon sx={{ color: active ? 'common.white' : 'primary.main', minWidth: 38 }}>{item.icon}</ListItemIcon>
-              <ListItemText primary={item.label} primaryTypographyProps={{ fontWeight: active ? 700 : 500, fontSize: '0.9rem' }} />
+              <ListItemText
+                primary={item.label}
+                slotProps={{
+                  primary: {
+                    sx: { fontWeight: active ? 700 : 500, fontSize: '0.9rem' },
+                  },
+                }}
+              />
             </ListItemButton>
           </ListItem>
           );
@@ -238,13 +343,13 @@ export default function DrawerAppBar(props: Props) {
         <ListItem disablePadding sx={{ mb: 0.5 }}>
           <ListItemButton sx={{ borderRadius: 2 }} component={RouterLink} to="/settings">
             <ListItemIcon sx={{ color: 'primary.main', minWidth: 38 }}><SettingsIcon /></ListItemIcon>
-            <ListItemText primary="Help & Support" primaryTypographyProps={{ fontSize: '0.9rem' }} />
+            <ListItemText primary="Help & Support" slotProps={{ primary: { sx: { fontSize: '0.9rem' } } }} />
           </ListItemButton>
         </ListItem>
         <ListItem disablePadding>
           <ListItemButton onClick={isAuthenticated ? handleLogout : handleLoginClick} sx={{ borderRadius: 2 }}>
             <ListItemIcon sx={{ color: 'primary.main', minWidth: 38 }}><AccountCircleIcon /></ListItemIcon>
-            <ListItemText primary={isAuthenticated ? 'Log out' : 'Log in'} primaryTypographyProps={{ fontSize: '0.9rem' }} />
+            <ListItemText primary={isAuthenticated ? 'Log out' : 'Log in'} slotProps={{ primary: { sx: { fontSize: '0.9rem' } } }} />
           </ListItemButton>
         </ListItem>
       </List>
@@ -254,7 +359,7 @@ export default function DrawerAppBar(props: Props) {
   const container = window !== undefined ? () => window().document.body : undefined;
 
   return (
-    <Box sx={{ display: 'flex', minHeight: '100vh' }}>
+    <Box sx={{ display: 'flex', height: '100vh', overflow: 'hidden' }}>
       <CssBaseline />
       <AppBar
         component="nav"
@@ -308,6 +413,15 @@ export default function DrawerAppBar(props: Props) {
               >
                 Where Ambition Meets Achievement
               </Typography>
+              {isAuthenticated && currentUser?.firstName && (
+                <Typography
+                  variant="caption"
+                  noWrap
+                  sx={{ color: 'common.white', display: { xs: 'none', sm: 'block' }, opacity: 0.95, lineHeight: 1.1, maxWidth: { sm: 180, md: 'none' } }}
+                >
+                  Welcome, {currentUser.firstName}
+                </Typography>
+              )}
             </Box>
           </Box>
 
@@ -317,7 +431,7 @@ export default function DrawerAppBar(props: Props) {
             </SearchIconWrapper>
             <StyledInputBase
               placeholder="Search students, courses..."
-              inputProps={{ 'aria-label': 'search' }}
+              slotProps={{ input: { 'aria-label': 'search' } }}
             />
           </Search>
 
@@ -328,8 +442,9 @@ export default function DrawerAppBar(props: Props) {
             size="small"
             sx={{ display: { xs: 'none', sm: 'flex' } }}
             aria-label="notifications"
+            onClick={handleNotificationMenuOpen}
           >
-            <Badge badgeContent={3} color="error">
+            <Badge badgeContent={isAuthenticated ? unreadNotifications : 0} color="error">
               <NotificationsIcon />
             </Badge>
           </IconButton>
@@ -407,7 +522,7 @@ export default function DrawerAppBar(props: Props) {
                 },
               }}
             >
-              {currentUser?.email ? currentUser.email.split('@')[0] : 'Account'}
+              {currentUser?.firstName || 'Account'}
             </Button>
           ) : (
             <Button
@@ -433,6 +548,82 @@ export default function DrawerAppBar(props: Props) {
           )}
         </Toolbar>
       </AppBar>
+
+      <Menu
+        anchorEl={notificationAnchor}
+        id="notification-menu"
+        open={notificationsOpen}
+        onClose={handleNotificationMenuClose}
+        slotProps={{
+          paper: {
+            elevation: 0,
+            sx: {
+              overflow: 'visible',
+              filter: 'drop-shadow(0px 2px 8px rgba(0,0,0,0.32))',
+              mt: 1.5,
+              width: 360,
+              maxHeight: 420,
+              overflowY: 'auto',
+            },
+          },
+        }}
+        transformOrigin={{ horizontal: 'right', vertical: 'top' }}
+        anchorOrigin={{ horizontal: 'right', vertical: 'bottom' }}
+      >
+        <Box sx={{ px: 2, py: 1.25, borderBottom: '1px solid', borderColor: 'divider', display: 'flex', justifyContent: 'space-between', alignItems: 'center', gap: 1 }}>
+          <Typography variant="subtitle2" sx={{ fontWeight: 800 }}>Notifications</Typography>
+          {notifications.some((item) => !item.readBy) && (
+            <Button size="small" onClick={() => void handleAllNotificationsRead()}>Mark all read</Button>
+          )}
+        </Box>
+        {!isAuthenticated ? (
+          <MenuItem disabled>Sign in to view notifications.</MenuItem>
+        ) : notifications.length === 0 ? (
+          <MenuItem disabled>No notifications yet.</MenuItem>
+        ) : (
+          notifications.map((notification) => {
+            const isRead = Boolean(notification.readBy);
+            return (
+              <MenuItem
+                key={notification.id}
+                onClick={() => handleNotificationRead(notification.id)}
+                sx={{
+                  display: 'block',
+                  whiteSpace: 'normal',
+                  borderBottom: '1px solid',
+                  borderColor: 'divider',
+                  opacity: isRead ? 0.7 : 1,
+                  py: 1.25,
+                }}
+              >
+                <Box sx={{ display: 'flex', justifyContent: 'space-between', gap: 1, mb: 0.5 }}>
+                  <Typography variant="subtitle2" sx={{ fontWeight: 700 }}>
+                    {notification.title}
+                  </Typography>
+                  {!isRead && (
+                    <Box
+                      sx={{
+                        width: 8,
+                        height: 8,
+                        borderRadius: '50%',
+                        bgcolor: 'error.main',
+                        mt: 0.7,
+                        flexShrink: 0,
+                      }}
+                    />
+                  )}
+                </Box>
+                <Typography variant="body2" color="text.secondary" sx={{ lineHeight: 1.5 }}>
+                  {notification.message}
+                </Typography>
+                <Typography variant="caption" color="text.secondary" sx={{ display: 'block', mt: 0.5 }}>
+                  {new Date(notification.createdAt).toLocaleString()}
+                </Typography>
+              </MenuItem>
+            );
+          })
+        )}
+      </Menu>
 
       <Menu
         anchorEl={profileAnchor}
@@ -501,10 +692,11 @@ export default function DrawerAppBar(props: Props) {
         component="main"
         sx={{
           width: { sm: `calc(100% - ${drawerWidth}px)` },
-          minHeight: '100vh',
+          height: '100vh',
           display: 'flex',
           flexDirection: 'column',
           overflowX: 'hidden',
+          overflowY: 'auto',
           background:
             mode === 'dark'
               ? 'radial-gradient(circle at top left, rgba(31,95,139,0.18), transparent 34%), linear-gradient(180deg, #08111f 0%, #0f1c2d 100%)'

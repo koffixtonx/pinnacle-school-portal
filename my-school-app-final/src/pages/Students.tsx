@@ -21,6 +21,7 @@ import {
   DialogActions,
 } from '@mui/material';
 import { adminService } from '../services/api.service';
+import { isAdminRole, useCurrentUser } from '../hooks/useCurrentUser';
 
 interface Student {
   id: string;
@@ -28,17 +29,25 @@ interface Student {
   lastName: string;
   email: string;
   active: boolean;
+  studentStatus?: 'ACTIVE' | 'INACTIVE' | 'ON_PROBATION';
+  admittedYear?: number | null;
+  studentLevel?: string;
+  department?: { id: string; name: string; code: string } | null;
   createdAt: string;
 }
 
 const Students: React.FC = () => {
+  const currentUser = useCurrentUser();
+  const canManageStudents = isAdminRole(currentUser?.role) || currentUser?.role === 'TEACHER';
+  const canCreateStudents = isAdminRole(currentUser?.role);
   const [students, setStudents] = React.useState<Student[]>([]);
   const [cursor, setCursor] = React.useState<string | null>(null);
   const [search, setSearch] = React.useState('');
   const [loading, setLoading] = React.useState(false);
   const [error, setError] = React.useState('');
   const [dialogOpen, setDialogOpen] = React.useState(false);
-  const [form, setForm] = React.useState({ firstName: '', lastName: '', email: '' });
+  const [departments, setDepartments] = React.useState<Array<{ id: string; name: string; code: string }>>([]);
+  const [form, setForm] = React.useState<{ firstName: string; lastName: string; email: string; studentStatus: NonNullable<Student['studentStatus']>; admittedYear: string; studentLevel: string; departmentId: string }>({ firstName: '', lastName: '', email: '', studentStatus: 'ACTIVE', admittedYear: '', studentLevel: '100', departmentId: '' });
   const [editingStudent, setEditingStudent] = React.useState<Student | null>(null);
   const isValidEmail = (value: string) => /\S+@\S+\.\S+/.test(value);
 
@@ -58,6 +67,7 @@ const Students: React.FC = () => {
 
   React.useEffect(() => {
     fetchStudents();
+    if (canManageStudents) adminService.listDepartments().then((response) => setDepartments(response.data.data ?? [])).catch(() => undefined);
   }, []);
 
   const handleSave = async () => {
@@ -68,9 +78,9 @@ const Students: React.FC = () => {
       }
       setLoading(true);
       if (editingStudent) {
-        await adminService.updateStudent(editingStudent.id, { firstName: form.firstName, lastName: form.lastName, email: form.email });
+        await adminService.updateStudent(editingStudent.id, { firstName: form.firstName, lastName: form.lastName, email: form.email, studentStatus: form.studentStatus, admittedYear: form.admittedYear ? Number(form.admittedYear) : null, studentLevel: form.studentLevel, departmentId: form.departmentId || null });
         // update in place
-        setStudents((prev) => prev.map((s) => (s.id === editingStudent.id ? { ...s, firstName: form.firstName, lastName: form.lastName, email: form.email } : s)));
+        setStudents((prev) => prev.map((s) => (s.id === editingStudent.id ? { ...s, firstName: form.firstName, lastName: form.lastName, email: form.email, studentStatus: form.studentStatus, admittedYear: form.admittedYear ? Number(form.admittedYear) : null, studentLevel: form.studentLevel, department: departments.find((department) => department.id === form.departmentId) ?? null } : s)));
       } else {
         await adminService.createStudent(form.firstName, form.lastName, form.email);
         setCursor(null);
@@ -79,7 +89,7 @@ const Students: React.FC = () => {
       }
       setDialogOpen(false);
       setEditingStudent(null);
-      setForm({ firstName: '', lastName: '', email: '' });
+      setForm({ firstName: '', lastName: '', email: '', studentStatus: 'ACTIVE', admittedYear: '', studentLevel: '100', departmentId: '' });
     } catch (err: any) {
       setError(err.response?.data?.message || 'Failed to save student');
     } finally {
@@ -99,7 +109,7 @@ const Students: React.FC = () => {
 
   const handleEdit = (s: Student) => {
     setEditingStudent(s);
-    setForm({ firstName: s.firstName, lastName: s.lastName, email: s.email });
+    setForm({ firstName: s.firstName, lastName: s.lastName, email: s.email, studentStatus: s.studentStatus ?? (s.active ? 'ACTIVE' : 'INACTIVE'), admittedYear: s.admittedYear?.toString() ?? '', studentLevel: s.studentLevel ?? '100', departmentId: s.department?.id ?? '' });
     setDialogOpen(true);
   };
 
@@ -136,7 +146,7 @@ const Students: React.FC = () => {
           sx={{ minWidth: 300 }}
         />
         <Box component="span" sx={{ ml: 2 }}>
-          <Button variant="contained" onClick={() => setDialogOpen(true)}>New Student</Button>
+          {canCreateStudents && <Button variant="contained" onClick={() => setDialogOpen(true)}>New Student</Button>}
         </Box>
       </Box>
 
@@ -148,7 +158,10 @@ const Students: React.FC = () => {
                 <TableCell sx={{ fontWeight: 600 }}>Name</TableCell>
                 <TableCell sx={{ fontWeight: 600 }}>Email</TableCell>
                 <TableCell sx={{ fontWeight: 600 }}>Status</TableCell>
+                <TableCell sx={{ fontWeight: 600 }}>Level</TableCell>
+                <TableCell sx={{ fontWeight: 600 }}>Admitted</TableCell>
                 <TableCell sx={{ fontWeight: 600 }}>Joined</TableCell>
+                <TableCell sx={{ fontWeight: 600 }}>Actions</TableCell>
               </TableRow>
             </TableHead>
             <TableBody>
@@ -165,22 +178,24 @@ const Students: React.FC = () => {
                   <TableCell>{student.email}</TableCell>
                   <TableCell>
                     <Chip
-                      label={student.active ? 'Active' : 'Inactive'}
+                      label={student.studentStatus === 'ON_PROBATION' ? 'On Probation' : student.studentStatus === 'INACTIVE' ? 'Inactive' : 'Active'}
                       size="small"
-                      color={student.active ? 'success' : 'default'}
+                      color={student.studentStatus === 'ON_PROBATION' ? 'warning' : student.studentStatus === 'ACTIVE' || (!student.studentStatus && student.active) ? 'success' : 'default'}
                       variant="outlined"
                     />
                   </TableCell>
+                  <TableCell>{student.studentLevel ? `${student.studentLevel} Level` : '100 Level'}</TableCell>
+                  <TableCell>{student.admittedYear ?? '—'}</TableCell>
                   <TableCell>{new Date(student.createdAt).toLocaleDateString()}</TableCell>
                   <TableCell>
-                    <Button size="small" onClick={() => handleEdit(student)}>Edit</Button>
-                    <Button size="small" color="error" onClick={() => handleDelete(student.id)}>Delete</Button>
+                    {canManageStudents && <Button size="small" onClick={() => handleEdit(student)}>Edit</Button>}
+                    {canCreateStudents && <Button size="small" color="error" onClick={() => handleDelete(student.id)}>Delete</Button>}
                   </TableCell>
                 </TableRow>
               ))}
               {filtered.length === 0 && !loading && (
                 <TableRow>
-                  <TableCell colSpan={4}>
+                  <TableCell colSpan={7}>
                     <Typography variant="body2" color="text.secondary">
                       No students found.
                     </Typography>
@@ -198,6 +213,19 @@ const Students: React.FC = () => {
           <TextField label="First name" fullWidth margin="normal" value={form.firstName} onChange={(e) => setForm({ ...form, firstName: e.target.value })} />
           <TextField label="Last name" fullWidth margin="normal" value={form.lastName} onChange={(e) => setForm({ ...form, lastName: e.target.value })} />
           <TextField label="Email" fullWidth margin="normal" value={form.email} onChange={(e) => setForm({ ...form, email: e.target.value })} />
+          {editingStudent && <TextField select label="Status" fullWidth margin="normal" value={form.studentStatus} onChange={(e) => setForm({ ...form, studentStatus: e.target.value as NonNullable<Student['studentStatus']> })}>
+            <option value="ACTIVE">Active</option>
+            <option value="INACTIVE">Inactive</option>
+            <option value="ON_PROBATION">On Probation</option>
+          </TextField>}
+          {editingStudent && <TextField select label="Level" fullWidth margin="normal" value={form.studentLevel} onChange={(e) => setForm({ ...form, studentLevel: e.target.value })}>
+            {['100', '200', '300', '400', '500'].map((level) => <option key={level} value={level}>{level} Level</option>)}
+          </TextField>}
+          {editingStudent && <TextField label="Year admitted" type="number" fullWidth margin="normal" value={form.admittedYear} onChange={(e) => setForm({ ...form, admittedYear: e.target.value })} inputProps={{ min: 2000, max: 2100 }} />}
+          {editingStudent && <TextField select label="Department" fullWidth margin="normal" value={form.departmentId} onChange={(e) => setForm({ ...form, departmentId: e.target.value })}>
+            <option value="">Unassigned</option>
+            {departments.map((department) => <option key={department.id} value={department.id}>{department.code} - {department.name}</option>)}
+          </TextField>}
         </DialogContent>
         <DialogActions>
           <Button onClick={() => setDialogOpen(false)}>Cancel</Button>

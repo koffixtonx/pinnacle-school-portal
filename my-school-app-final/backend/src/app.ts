@@ -17,17 +17,27 @@ import { globalLimiter } from './middleware/rateLimiter.js';
 
 const app = express();
 
-app.use(helmet());
+app.set('trust proxy', 1);
+
+app.use(helmet({
+  crossOriginResourcePolicy: { policy: 'cross-origin' },
+}));
 app.use(morgan('combined'));
 app.use(cookieParser());
 app.use(express.json({ limit: '10mb' }));
 app.use(express.urlencoded({ extended: true }));
+const configuredOrigins = (process.env.CLIENT_URL ?? 'http://localhost:5173')
+  .split(',')
+  .map((value) => value.trim().replace(/\/$/, ''))
+  .filter(Boolean);
+
+const developmentOrigins = ['http://localhost:5173', 'http://127.0.0.1:5173', 'http://localhost:5174', 'http://127.0.0.1:5174'];
+
 app.use(
   cors({
     origin: (origin, callback) => {
-      const configuredOrigin = process.env.CLIENT_URL ?? 'http://localhost:5173';
-      const developmentOrigins = ['http://localhost:5173', 'http://127.0.0.1:5173'];
-      const allowed = !origin || origin === configuredOrigin || (process.env.NODE_ENV !== 'production' && developmentOrigins.includes(origin));
+      const normalizedOrigin = origin?.replace(/\/$/, '');
+      const allowed = !origin || configuredOrigins.includes(normalizedOrigin ?? '') || (process.env.NODE_ENV !== 'production' && developmentOrigins.includes(normalizedOrigin ?? ''));
       callback(allowed ? null : new Error('Origin is not allowed by CORS'), allowed);
     },
     credentials: true,

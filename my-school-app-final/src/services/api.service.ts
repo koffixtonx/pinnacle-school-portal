@@ -13,6 +13,9 @@ export const authService = {
 
   logout: () =>
     api.post('/auth/logout'),
+
+  updateProfile: (fullName: string, phone: string) =>
+    api.put('/auth/profile', { fullName, phone }),
 };
 
 export const adminService = {
@@ -30,7 +33,7 @@ export const adminService = {
 
   createStudent: (firstName: string, lastName: string, email: string) =>
     api.post('/admin/students', { firstName, lastName, email }),
-  updateStudent: (id: string, data: Partial<{ firstName: string; lastName: string; email: string; active: boolean }>) =>
+  updateStudent: (id: string, data: Partial<{ firstName: string; lastName: string; email: string; active: boolean; studentStatus: 'ACTIVE' | 'INACTIVE' | 'ON_PROBATION'; admittedYear: number | null; studentLevel: string; departmentId: string | null }>) =>
     api.put(`/admin/students/${id}`, data),
   deleteStudent: (id: string) => api.delete(`/admin/students/${id}`),
 
@@ -48,18 +51,27 @@ export const adminService = {
 
   getAuditLogs: (params?: { limit?: number; cursor?: string }) =>
     api.get('/admin/audit-logs', { params }),
+  listFaculties: () => api.get('/admin/faculties'),
+  createFaculty: (name: string) => api.post('/admin/faculties', { name }),
+  listDepartments: () => api.get('/admin/departments'),
+  createDepartment: (name: string, code: string, facultyId: string) => api.post('/admin/departments', { name, code, facultyId }),
 };
 
 export const academicsService = {
   listCourses: () => api.get('/academics/courses'),
-  createCourse: (title: string, code: string, description: string, teacherIds?: string[]) =>
-    api.post('/academics/courses', { title, code, description, teacherIds }),
-  updateCourse: (id: string, data: Partial<{ title: string; code: string; description: string; teacherIds: string[] }>) =>
+  getCourseHierarchy: () => api.get('/academics/course-hierarchy'),
+  createCourse: (title: string, code: string, description: string, teacherIds?: string[], level?: string) =>
+    api.post('/academics/courses', { title, code, description, teacherIds, level }),
+  updateCourse: (id: string, data: Partial<{ title: string; code: string; description: string; teacherIds: string[]; level: string; departmentId: string | null }>) =>
     api.put(`/academics/courses/${id}`, data),
   deleteCourse: (id: string) => api.delete(`/academics/courses/${id}`),
   enrollStudent: (courseId: string, studentId: string) =>
     api.post(`/academics/courses/${courseId}/enroll`, { studentId }),
   listCourseEnrollments: (courseId: string) => api.get(`/academics/courses/${courseId}/enrollments`),
+  listAvailableCourses: () => api.get('/academics/courses/available'),
+  requestCourseEnrollment: (courseId: string) => api.post(`/academics/courses/${courseId}/request-enrollment`),
+  listPendingEnrollments: () => api.get('/academics/enrollments/pending'),
+  reviewEnrollment: (enrollmentId: string, status: 'ACTIVE' | 'REJECTED') => api.patch(`/academics/enrollments/${enrollmentId}/review`, { status }),
 
   listClassSections: () => api.get('/academics/classes'),
   createClassSection: (name: string, grade: string, homeroomTeacherId?: string) =>
@@ -80,6 +92,9 @@ export const academicsService = {
     room: string;
   }) => api.post('/academics/timetable', data),
   deleteTimetableSlot: (id: string) => api.delete(`/academics/timetable/${id}`),
+  listDepartmentTimetable: () => api.get('/academics/department-timetable'),
+  createDepartmentTimetableSlot: (data: { courseId: string; departmentId: string; dayOfWeek: number; startHour: number }) => api.post('/academics/department-timetable', data),
+  deleteDepartmentTimetableSlot: (id: string) => api.delete(`/academics/department-timetable/${id}`),
 };
 
 export const attendanceService = {
@@ -112,6 +127,12 @@ export const feesService = {
     api.post(`/fees/invoices/${invoiceId}/payments`, { amount, method, transactionId }),
 };
 
+export const notificationsService = {
+  list: () => api.get('/notifications'),
+  markRead: (id: string) => api.patch(`/notifications/${id}/read`),
+  markAllRead: () => api.patch('/notifications/read-all'),
+};
+
 export default api;
 
 export const siteSettingsService = {
@@ -121,4 +142,8 @@ export const siteSettingsService = {
   // Protected endpoints for admins
   get: () => api.get('/site-settings'),
   update: (formData: FormData) => api.post('/site-settings', formData, { headers: { 'Content-Type': 'multipart/form-data' } }),
+  getWelcomeMessage: () => api.get('/site-settings/welcome-message'),
+  updateWelcomeMessage: (welcomeMessage: string, welcomeMessageColor: string) => api.put('/site-settings/welcome-message', { welcomeMessage, welcomeMessageColor }),
+  getWelcomeBackgrounds: () => api.get('/site-settings/welcome-backgrounds'),
+  updateWelcomeBackgrounds: (formData: FormData) => api.put('/site-settings/welcome-backgrounds', formData, { headers: { 'Content-Type': 'multipart/form-data' } }),
 };

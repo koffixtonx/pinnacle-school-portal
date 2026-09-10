@@ -3,6 +3,7 @@ import { body } from 'express-validator';
 import { authLimiter } from '../middleware/rateLimiter.js';
 import { AuthController } from '../controllers/authController.js';
 import { validateRequest } from '../middleware/validateRequest.js';
+import { authenticate } from '../middleware/authMiddleware.js';
 
 const router = Router();
 
@@ -28,5 +29,6 @@ router.post(
 
 router.post('/refresh', authLimiter, AuthController.refresh);
 router.post('/logout', AuthController.logout);
+router.put('/profile', authenticate, AuthController.updateProfile);
 
 export { router as authRouter };

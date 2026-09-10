@@ -1,0 +1,1290 @@
+{
+  "_notes": "Seed template for Faculty -> Department -> Course. Each department has a confidence field: confirmed (verified from a Unijos handbook), reference (from another Nigerian university's published NUC CCMAS document for the same programme, not Unijos-verified), or unresearched (empty courses array). creditUnits is an integer. semester is 1 or 2. level is 100/200/300/400.",
+  "faculties": [
+    {
+      "name": "Faculty of Agricultural Sciences",
+      "departments": [
+        {
+          "name": "Agricultural Economics & Extension",
+          "courses": [],
+          "confidence": "unresearched"
+        },
+        {
+          "name": "Animal Production",
+          "courses": [],
+          "confidence": "unresearched"
+        },
+        {
+          "name": "Crop Production",
+          "courses": [],
+          "confidence": "unresearched"
+        }
+      ]
+    },
+    {
+      "name": "Faculty of Arts",
+      "departments": [
+        {
+          "name": "Archeology and Heritage Studies",
+          "courses": [],
+          "confidence": "unresearched"
+        },
+        {
+          "name": "English",
+          "courses": [],
+          "confidence": "unresearched"
+        },
+        {
+          "name": "Foreign Languages",
+          "courses": [],
+          "confidence": "unresearched"
+        },
+        {
+          "name": "History and International Studies",
+          "courses": [],
+          "confidence": "unresearched"
+        },
+        {
+          "name": "Linguistics and Nigerian Languages",
+          "courses": [],
+          "confidence": "unresearched"
+        },
+        {
+          "name": "Mass Communication",
+          "courses": [],
+          "confidence": "unresearched"
+        },
+        {
+          "name": "Music",
+          "courses": [],
+          "confidence": "unresearched"
+        },
+        {
+          "name": "Religion and Philosophy",
+          "courses": [],
+          "confidence": "unresearched"
+        }
+      ]
+    },
+    {
+      "name": "Faculty of Education",
+      "departments": [
+        {
+          "name": "Arts Education",
+          "courses": [],
+          "confidence": "unresearched"
+        },
+        {
+          "name": "Educational Foundations",
+          "courses": [],
+          "confidence": "unresearched"
+        },
+        {
+          "name": "Physical and Health Education",
+          "courses": [],
+          "confidence": "unresearched"
+        },
+        {
+          "name": "Science and Technology Education",
+          "courses": [],
+          "confidence": "unresearched"
+        },
+        {
+          "name": "Social Science Education",
+          "courses": [],
+          "confidence": "unresearched"
+        },
+        {
+          "name": "Special Education and Rehabilitation Sciences",
+          "courses": [],
+          "confidence": "unresearched"
+        }
+      ]
+    },
+    {
+      "name": "Faculty of Engineering",
+      "departments": [
+        {
+          "name": "Civil Engineering",
+          "courses": [],
+          "confidence": "unresearched"
+        },
+        {
+          "name": "Electrical and Electronic Engineering",
+          "courses": [],
+          "confidence": "unresearched"
+        },
+        {
+          "name": "Mechanical Engineering",
+          "courses": [],
+          "confidence": "unresearched"
+        },
+        {
+          "name": "Mining Engineering",
+          "courses": [],
+          "confidence": "unresearched"
+        }
+      ]
+    },
+    {
+      "name": "Faculty of Environmental Sciences",
+      "departments": [
+        {
+          "name": "Architecture",
+          "courses": [],
+          "confidence": "unresearched"
+        },
+        {
+          "name": "Building",
+          "courses": [],
+          "confidence": "unresearched"
+        },
+        {
+          "name": "Estate Management",
+          "courses": [],
+          "confidence": "unresearched"
+        },
+        {
+          "name": "Fine and Applied Arts",
+          "courses": [],
+          "confidence": "unresearched"
+        },
+        {
+          "name": "Geography and Planning",
+          "courses": [],
+          "confidence": "unresearched"
+        },
+        {
+          "name": "Quantity Surveying",
+          "courses": [],
+          "confidence": "unresearched"
+        },
+        {
+          "name": "Urban and Regional Planning",
+          "courses": [],
+          "confidence": "unresearched"
+        }
+      ]
+    },
+    {
+      "name": "Faculty of Law",
+      "departments": [
+        {
+          "name": "Commercial Law",
+          "courses": [],
+          "confidence": "unresearched"
+        },
+        {
+          "name": "Public Law",
+          "courses": [],
+          "confidence": "unresearched"
+        },
+        {
+          "name": "Private Law",
+          "courses": [],
+          "confidence": "unresearched"
+        },
+        {
+          "name": "International Law and Jurisprudence",
+          "courses": [],
+          "confidence": "unresearched"
+        }
+      ]
+    },
+    {
+      "name": "Faculty of Management Sciences",
+      "departments": [
+        {
+          "name": "Accounting",
+          "courses": [
+            {
+              "code": "GST 111",
+              "title": "Communication in English Language",
+              "creditUnits": 2,
+              "level": 100,
+              "semester": 1
+            },
+            {
+              "code": "GST 112",
+              "title": "Nigerian Peoples and Culture",
+              "creditUnits": 2,
+              "level": 100,
+              "semester": 1
+            },
+            {
+              "code": "ACC 101",
+              "title": "Introduction to Financial Accounting I",
+              "creditUnits": 3,
+              "level": 100,
+              "semester": 1
+            },
+            {
+              "code": "ACC 102",
+              "title": "Introduction to Financial Accounting II",
+              "creditUnits": 3,
+              "level": 100,
+              "semester": 1
+            },
+            {
+              "code": "GST 212",
+              "title": "Philosophy, Logic and Human Existence",
+              "creditUnits": 2,
+              "level": 200,
+              "semester": 1
+            },
+            {
+              "code": "ENT 211",
+              "title": "Entrepreneurship and Innovation",
+              "creditUnits": 2,
+              "level": 200,
+              "semester": 1
+            },
+            {
+              "code": "ACC 201",
+              "title": "Financial Accounting I",
+              "creditUnits": 3,
+              "level": 200,
+              "semester": 1
+            },
+            {
+              "code": "ACC 202",
+              "title": "Financial Accounting II",
+              "creditUnits": 3,
+              "level": 200,
+              "semester": 1
+            },
+            {
+              "code": "ACC 203",
+              "title": "Corporate Governance & Accounting Ethics",
+              "creditUnits": 3,
+              "level": 200,
+              "semester": 1
+            },
+            {
+              "code": "ACC 204",
+              "title": "Cost Accounting",
+              "creditUnits": 3,
+              "level": 200,
+              "semester": 1
+            },
+            {
+              "code": "ACC 206",
+              "title": "Accounting Laboratory",
+              "creditUnits": 3,
+              "level": 200,
+              "semester": 1
+            },
+            {
+              "code": "GST 312",
+              "title": "Peace and Conflict Resolution",
+              "creditUnits": 2,
+              "level": 300,
+              "semester": 1
+            },
+            {
+              "code": "ENT 312",
+              "title": "Venture Creation",
+              "creditUnits": 2,
+              "level": 300,
+              "semester": 1
+            },
+            {
+              "code": "ACC 301",
+              "title": "Financial Reporting I",
+              "creditUnits": 3,
+              "level": 300,
+              "semester": 1
+            },
+            {
+              "code": "ACC 302",
+              "title": "Financial Reporting II",
+              "creditUnits": 3,
+              "level": 300,
+              "semester": 1
+            },
+            {
+              "code": "ACC 303",
+              "title": "Management Accounting (Performance Management)",
+              "creditUnits": 3,
+              "level": 300,
+              "semester": 1
+            },
+            {
+              "code": "ACC 305",
+              "title": "Taxation I",
+              "creditUnits": 3,
+              "level": 300,
+              "semester": 1
+            },
+            {
+              "code": "ACC 306",
+              "title": "Taxation II",
+              "creditUnits": 3,
+              "level": 300,
+              "semester": 1
+            },
+            {
+              "code": "ACC 307",
+              "title": "Auditing and Assurance I",
+              "creditUnits": 3,
+              "level": 300,
+              "semester": 1
+            },
+            {
+              "code": "ACC 308",
+              "title": "Public Sector Accounting & Reporting",
+              "creditUnits": 3,
+              "level": 300,
+              "semester": 1
+            },
+            {
+              "code": "ACC 311",
+              "title": "Entrepreneurship in Accounting Education",
+              "creditUnits": 3,
+              "level": 300,
+              "semester": 1
+            },
+            {
+              "code": "ACC 401",
+              "title": "Advanced Financial Reporting",
+              "creditUnits": 3,
+              "level": 400,
+              "semester": 1
+            },
+            {
+              "code": "ACC 402",
+              "title": "Corporate Reporting",
+              "creditUnits": 3,
+              "level": 400,
+              "semester": 1
+            },
+            {
+              "code": "ACC 403",
+              "title": "Auditing and Assurance II",
+              "creditUnits": 3,
+              "level": 400,
+              "semester": 1
+            },
+            {
+              "code": "ACC 404",
+              "title": "Financial Management",
+              "creditUnits": 3,
+              "level": 400,
+              "semester": 1
+            },
+            {
+              "code": "ACC 405",
+              "title": "Bankruptcy & Liquidation",
+              "creditUnits": 3,
+              "level": 400,
+              "semester": 1
+            },
+            {
+              "code": "ACC 490",
+              "title": "Project",
+              "creditUnits": 6,
+              "level": 400,
+              "semester": 1
+            }
+          ],
+          "confidence": "reference",
+          "source": "Godfrey Okoye University published CCMAS document for B.Sc. Accounting (national NUC benchmark, core ACC/GST/ENT courses only)"
+        },
+        {
+          "name": "Actuarial Science",
+          "courses": [],
+          "confidence": "unresearched"
+        },
+        {
+          "name": "Banking and Finance",
+          "courses": [],
+          "confidence": "unresearched"
+        },
+        {
+          "name": "Business Administration",
+          "courses": [],
+          "confidence": "unresearched"
+        },
+        {
+          "name": "Business Management",
+          "courses": [],
+          "confidence": "unresearched"
+        },
+        {
+          "name": "Insurance",
+          "courses": [],
+          "confidence": "unresearched"
+        },
+        {
+          "name": "Marketing",
+          "courses": [],
+          "confidence": "unresearched"
+        }
+      ]
+    },
+    {
+      "name": "Faculty of Natural Sciences",
+      "departments": [
+        {
+          "name": "Chemistry",
+          "courses": [],
+          "confidence": "unresearched"
+        },
+        {
+          "name": "Computer Science",
+          "courses": [
+            {
+              "code": "GST 111",
+              "title": "Communication in English",
+              "creditUnits": 2,
+              "level": 100,
+              "semester": 1
+            },
+            {
+              "code": "GST 112",
+              "title": "Nigerian Peoples and Culture",
+              "creditUnits": 2,
+              "level": 100,
+              "semester": 1
+            },
+            {
+              "code": "COS 101",
+              "title": "Introduction to Computing Sciences",
+              "creditUnits": 3,
+              "level": 100,
+              "semester": 1
+            },
+            {
+              "code": "COS 102",
+              "title": "Problem Solving",
+              "creditUnits": 3,
+              "level": 100,
+              "semester": 1
+            },
+            {
+              "code": "MTH 101",
+              "title": "Elementary Mathematics I (Algebra & Trigonometry)",
+              "creditUnits": 2,
+              "level": 100,
+              "semester": 1
+            },
+            {
+              "code": "MTH 102",
+              "title": "Elementary Mathematics II (Calculus)",
+              "creditUnits": 2,
+              "level": 100,
+              "semester": 1
+            },
+            {
+              "code": "STA 111",
+              "title": "Descriptive Statistics",
+              "creditUnits": 3,
+              "level": 100,
+              "semester": 1
+            },
+            {
+              "code": "PHY 101",
+              "title": "General Physics I (Mechanics)",
+              "creditUnits": 2,
+              "level": 100,
+              "semester": 1
+            },
+            {
+              "code": "PHY 102",
+              "title": "General Physics II (Electricity & Magnetism)",
+              "creditUnits": 2,
+              "level": 100,
+              "semester": 1
+            },
+            {
+              "code": "PHY 107",
+              "title": "General Practical Physics I",
+              "creditUnits": 1,
+              "level": 100,
+              "semester": 1
+            },
+            {
+              "code": "PHY 108",
+              "title": "General Practical Physics II",
+              "creditUnits": 1,
+              "level": 100,
+              "semester": 1
+            }
+          ],
+          "confidence": "reference",
+          "source": "University of Ibadan published CCMAS document for B.Sc. Computer Science (100 level only)"
+        },
+        {
+          "name": "Geology",
+          "courses": [],
+          "confidence": "unresearched"
+        },
+        {
+          "name": "Mathematics",
+          "courses": [],
+          "confidence": "unresearched"
+        },
+        {
+          "name": "Microbiology",
+          "courses": [],
+          "confidence": "unresearched"
+        },
+        {
+          "name": "Physics",
+          "courses": [],
+          "confidence": "unresearched"
+        },
+        {
+          "name": "Plant Science and Technology",
+          "courses": [],
+          "confidence": "unresearched"
+        },
+        {
+          "name": "Remedial Sciences",
+          "courses": [],
+          "confidence": "unresearched"
+        },
+        {
+          "name": "Science Laboratory Technology",
+          "courses": [],
+          "confidence": "unresearched"
+        },
+        {
+          "name": "Zoology",
+          "courses": [],
+          "confidence": "unresearched"
+        }
+      ]
+    },
+    {
+      "name": "Faculty of Pharmaceutical Sciences",
+      "departments": [
+        {
+          "name": "Pharmaceutical and Medicinal Chemistry",
+          "courses": [],
+          "confidence": "unresearched"
+        },
+        {
+          "name": "Pharmaceutics",
+          "courses": [],
+          "confidence": "unresearched"
+        },
+        {
+          "name": "Pharmaceutical Technology and Industrial Pharmacy",
+          "courses": [],
+          "confidence": "unresearched"
+        },
+        {
+          "name": "Pharmaceutical Microbiology and Biotechnology",
+          "courses": [],
+          "confidence": "unresearched"
+        },
+        {
+          "name": "Pharmacognosy and Traditional Medicine",
+          "courses": [],
+          "confidence": "unresearched"
+        },
+        {
+          "name": "Pharmacology and Toxicology",
+          "courses": [],
+          "confidence": "unresearched"
+        },
+        {
+          "name": "Clinical Pharmacy and Pharmacy Practice",
+          "courses": [],
+          "confidence": "unresearched"
+        }
+      ]
+    },
+    {
+      "name": "Faculty of Social Sciences",
+      "departments": [
+        {
+          "name": "Economics",
+          "courses": [
+            {
+              "code": "ECO 101",
+              "title": "Principles of Economics I",
+              "creditUnits": 2,
+              "level": 100,
+              "semester": 1
+            },
+            {
+              "code": "ECO 121",
+              "title": "Introduction to Accounting",
+              "creditUnits": 2,
+              "level": 100,
+              "semester": 1
+            },
+            {
+              "code": "ECO 131",
+              "title": "Introduction to Economic Statistics I",
+              "creditUnits": 2,
+              "level": 100,
+              "semester": 1
+            },
+            {
+              "code": "COS 101",
+              "title": "Introduction to Computer Science",
+              "creditUnits": 2,
+              "level": 100,
+              "semester": 1
+            },
+            {
+              "code": "MTH 111",
+              "title": "Elementary Mathematics I",
+              "creditUnits": 2,
+              "level": 100,
+              "semester": 1
+            }
+          ],
+          "confidence": "reference",
+          "source": "University of Nigeria, Nsukka course modules page (year 1, semester 1 only)"
+        },
+        {
+          "name": "Political Science",
+          "courses": [],
+          "confidence": "unresearched"
+        },
+        {
+          "name": "Criminology and Security Studies",
+          "courses": [],
+          "confidence": "unresearched"
+        },
+        {
+          "name": "Psychology",
+          "courses": [],
+          "confidence": "unresearched"
+        },
+        {
+          "name": "Sociology",
+          "courses": [],
+          "confidence": "unresearched"
+        }
+      ]
+    },
+    {
+      "name": "Faculty of Veterinary Medicine",
+      "departments": [
+        {
+          "name": "Veterinary Public Health and Preventive Medicine",
+          "courses": [],
+          "confidence": "unresearched"
+        },
+        {
+          "name": "Veterinary Physiology, Biochemistry and Pharmacology",
+          "courses": [],
+          "confidence": "unresearched"
+        },
+        {
+          "name": "Veterinary Parasitology and Entomology",
+          "courses": [],
+          "confidence": "unresearched"
+        },
+        {
+          "name": "Veterinary Microbiology and Pathology",
+          "courses": [],
+          "confidence": "unresearched"
+        },
+        {
+          "name": "Veterinary Medicine and Surgery",
+          "courses": [],
+          "confidence": "unresearched"
+        },
+        {
+          "name": "Veterinary Anatomy",
+          "courses": [],
+          "confidence": "unresearched"
+        }
+      ]
+    },
+    {
+      "name": "Faculty of Basic Medical Sciences",
+      "college": "College of Health Sciences",
+      "departments": [
+        {
+          "name": "Biochemistry",
+          "courses": [
+            {
+              "code": "BIO 101",
+              "title": "General Biology I",
+              "creditUnits": 4,
+              "level": 100,
+              "semester": 1
+            },
+            {
+              "code": "BIO 105",
+              "title": "Practical Biology",
+              "creditUnits": 1,
+              "level": 100,
+              "semester": 1
+            },
+            {
+              "code": "CHM 101",
+              "title": "General Chemistry I (Physical)",
+              "creditUnits": 3,
+              "level": 100,
+              "semester": 1
+            },
+            {
+              "code": "CHM 103",
+              "title": "Practical Physical Chemistry",
+              "creditUnits": 1,
+              "level": 100,
+              "semester": 1
+            },
+            {
+              "code": "PHY 101",
+              "title": "General Physics I",
+              "creditUnits": 3,
+              "level": 100,
+              "semester": 1
+            },
+            {
+              "code": "PHY 107",
+              "title": "General Physics Laboratory I",
+              "creditUnits": 1,
+              "level": 100,
+              "semester": 1
+            },
+            {
+              "code": "MTH 101",
+              "title": "Elementary Mathematics I",
+              "creditUnits": 3,
+              "level": 100,
+              "semester": 1
+            },
+            {
+              "code": "CS 101",
+              "title": "Introduction to Computer Science",
+              "creditUnits": 2,
+              "level": 100,
+              "semester": 1
+            },
+            {
+              "code": "LIB 101",
+              "title": "Library Skills",
+              "creditUnits": 1,
+              "level": 100,
+              "semester": 1
+            },
+            {
+              "code": "BIO 102",
+              "title": "General Biology II",
+              "creditUnits": 4,
+              "level": 100,
+              "semester": 2
+            },
+            {
+              "code": "CHM 102",
+              "title": "General Chemistry II (Organic)",
+              "creditUnits": 3,
+              "level": 100,
+              "semester": 2
+            },
+            {
+              "code": "CHM 104",
+              "title": "Practical Organic Chemistry",
+              "creditUnits": 1,
+              "level": 100,
+              "semester": 2
+            },
+            {
+              "code": "CHM 105",
+              "title": "General Chemistry III (Inorganic)",
+              "creditUnits": 3,
+              "level": 100,
+              "semester": 2
+            },
+            {
+              "code": "CHM 106",
+              "title": "Practical Inorganic Chemistry",
+              "creditUnits": 1,
+              "level": 100,
+              "semester": 2
+            },
+            {
+              "code": "PHY 102",
+              "title": "General Physics II",
+              "creditUnits": 2,
+              "level": 100,
+              "semester": 2
+            },
+            {
+              "code": "PHY 108",
+              "title": "General Physics Laboratory II",
+              "creditUnits": 1,
+              "level": 100,
+              "semester": 2
+            },
+            {
+              "code": "MTH 102",
+              "title": "Elementary Mathematics II",
+              "creditUnits": 3,
+              "level": 100,
+              "semester": 2
+            },
+            {
+              "code": "MCB 101",
+              "title": "Introductory Microbiology",
+              "creditUnits": 2,
+              "level": 100,
+              "semester": 2
+            },
+            {
+              "code": "GST 101",
+              "title": "Use of English",
+              "creditUnits": 2,
+              "level": 100,
+              "semester": 2
+            },
+            {
+              "code": "GST 102",
+              "title": "Philosophy and Logic",
+              "creditUnits": 2,
+              "level": 100,
+              "semester": 2
+            },
+            {
+              "code": "GST 103",
+              "title": "History of Nigerian People and Culture",
+              "creditUnits": 2,
+              "level": 100,
+              "semester": 2
+            },
+            {
+              "code": "GST 104",
+              "title": "History and Philosophy of Science",
+              "creditUnits": 2,
+              "level": 100,
+              "semester": 2
+            },
+            {
+              "code": "BCH 202",
+              "title": "Structure and Function of Major Cell Components",
+              "creditUnits": 1,
+              "level": 200,
+              "semester": 1
+            },
+            {
+              "code": "BCH 203",
+              "title": "Chemistry of Amino Acids and Proteins",
+              "creditUnits": 2,
+              "level": 200,
+              "semester": 1
+            },
+            {
+              "code": "BCH 207",
+              "title": "Chemistry of Carbohydrates",
+              "creditUnits": 1,
+              "level": 200,
+              "semester": 1
+            },
+            {
+              "code": "BCH 205",
+              "title": "General Biochemistry Laboratory I",
+              "creditUnits": 1,
+              "level": 200,
+              "semester": 1
+            },
+            {
+              "code": "BIO 201",
+              "title": "Genetics I",
+              "creditUnits": 2,
+              "level": 200,
+              "semester": 1
+            },
+            {
+              "code": "BIO 204",
+              "title": "Biological Techniques",
+              "creditUnits": 2,
+              "level": 200,
+              "semester": 1
+            },
+            {
+              "code": "CHM 210",
+              "title": "Physical Chemistry II",
+              "creditUnits": 2,
+              "level": 200,
+              "semester": 1
+            },
+            {
+              "code": "CHM 211",
+              "title": "Organic Chemistry II",
+              "creditUnits": 3,
+              "level": 200,
+              "semester": 1
+            },
+            {
+              "code": "CHM 212",
+              "title": "Inorganic Chemistry II",
+              "creditUnits": 2,
+              "level": 200,
+              "semester": 1
+            },
+            {
+              "code": "CS 201",
+              "title": "Application of Computer in Science",
+              "creditUnits": 3,
+              "level": 200,
+              "semester": 1
+            },
+            {
+              "code": "EPS 201",
+              "title": "Entrepreneurial Skills I",
+              "creditUnits": 2,
+              "level": 200,
+              "semester": 1
+            },
+            {
+              "code": "GST 201",
+              "title": "Communication Skills",
+              "creditUnits": 3,
+              "level": 200,
+              "semester": 1
+            },
+            {
+              "code": "PST 202",
+              "title": "Seed/Seedless Plants",
+              "creditUnits": 2,
+              "level": 200,
+              "semester": 1,
+              "elective": true
+            },
+            {
+              "code": "CHM 214",
+              "title": "Structure and Bonding",
+              "creditUnits": 2,
+              "level": 200,
+              "semester": 1,
+              "elective": true
+            },
+            {
+              "code": "BCH 204",
+              "title": "Chemistry of Lipids",
+              "creditUnits": 1,
+              "level": 200,
+              "semester": 2
+            },
+            {
+              "code": "BCH 210",
+              "title": "Chemistry of Nucleic Acids",
+              "creditUnits": 1,
+              "level": 200,
+              "semester": 2
+            },
+            {
+              "code": "BCH 206",
+              "title": "General Biochemistry Laboratory II",
+              "creditUnits": 1,
+              "level": 200,
+              "semester": 2
+            },
+            {
+              "code": "BIO 203",
+              "title": "General Physiology",
+              "creditUnits": 2,
+              "level": 200,
+              "semester": 2
+            },
+            {
+              "code": "BIO/STA 202",
+              "title": "Statistics for Biologists",
+              "creditUnits": 4,
+              "level": 200,
+              "semester": 2
+            },
+            {
+              "code": "CHM 213",
+              "title": "Analytical Chemistry II",
+              "creditUnits": 3,
+              "level": 200,
+              "semester": 2
+            },
+            {
+              "code": "MCB 201",
+              "title": "General Microbiology I",
+              "creditUnits": 3,
+              "level": 200,
+              "semester": 2
+            },
+            {
+              "code": "GST 207",
+              "title": "Communication Skills I",
+              "creditUnits": 2,
+              "level": 200,
+              "semester": 2
+            },
+            {
+              "code": "BIO 205",
+              "title": "Intro. Developmental Cell Biology",
+              "creditUnits": 3,
+              "level": 200,
+              "semester": 2,
+              "elective": true
+            },
+            {
+              "code": "BCH 301",
+              "title": "Enzymology",
+              "creditUnits": 3,
+              "level": 300,
+              "semester": 1
+            },
+            {
+              "code": "BCH 302",
+              "title": "Metabolism of Carbohydrates",
+              "creditUnits": 2,
+              "level": 300,
+              "semester": 1
+            },
+            {
+              "code": "BCH 303",
+              "title": "Metabolism of Lipids",
+              "creditUnits": 2,
+              "level": 300,
+              "semester": 1
+            },
+            {
+              "code": "BCH 304",
+              "title": "Metabolism of Amino Acids & Proteins",
+              "creditUnits": 2,
+              "level": 300,
+              "semester": 1
+            },
+            {
+              "code": "BCH 305",
+              "title": "Metabolism of Nucleic Acids",
+              "creditUnits": 2,
+              "level": 300,
+              "semester": 1
+            },
+            {
+              "code": "BCH 306",
+              "title": "Methods in Biochemistry",
+              "creditUnits": 3,
+              "level": 300,
+              "semester": 1
+            },
+            {
+              "code": "BCH 307",
+              "title": "Membrane Biochemistry",
+              "creditUnits": 2,
+              "level": 300,
+              "semester": 1
+            },
+            {
+              "code": "BCH 310",
+              "title": "Bioenergetics",
+              "creditUnits": 1,
+              "level": 300,
+              "semester": 1
+            },
+            {
+              "code": "BCH 311",
+              "title": "General Biochemistry Laboratory III",
+              "creditUnits": 1,
+              "level": 300,
+              "semester": 1
+            },
+            {
+              "code": "CHM 301",
+              "title": "Physical Chemistry III",
+              "creditUnits": 2,
+              "level": 300,
+              "semester": 1
+            },
+            {
+              "code": "CHM 303",
+              "title": "Organic Chemistry III",
+              "creditUnits": 3,
+              "level": 300,
+              "semester": 1
+            },
+            {
+              "code": "CHM 312",
+              "title": "Instrumental Methods of Analysis",
+              "creditUnits": 2,
+              "level": 300,
+              "semester": 1
+            },
+            {
+              "code": "MCB 301",
+              "title": "Microbial Genetics & Molecular Biology",
+              "creditUnits": 3,
+              "level": 300,
+              "semester": 1
+            },
+            {
+              "code": "MCB 302",
+              "title": "Microbial Physiology and Metabolism",
+              "creditUnits": 3,
+              "level": 300,
+              "semester": 1
+            },
+            {
+              "code": "EPS 310",
+              "title": "Entrepreneurial Skills II",
+              "creditUnits": 2,
+              "level": 300,
+              "semester": 1
+            },
+            {
+              "code": "BCH 399",
+              "title": "Student Industrial Work Experience (SIWES)",
+              "creditUnits": 6,
+              "level": 300,
+              "semester": 2
+            },
+            {
+              "code": "BCH 401",
+              "title": "Advanced Enzymology",
+              "creditUnits": 2,
+              "level": 400,
+              "semester": 1
+            },
+            {
+              "code": "BCH 402",
+              "title": "Biosynthesis of Macromolecules",
+              "creditUnits": 1,
+              "level": 400,
+              "semester": 1
+            },
+            {
+              "code": "BCH 404",
+              "title": "Bioinorganic Chemistry",
+              "creditUnits": 1,
+              "level": 400,
+              "semester": 1
+            },
+            {
+              "code": "BCH 408",
+              "title": "Biochemical Reasoning",
+              "creditUnits": 1,
+              "level": 400,
+              "semester": 1
+            },
+            {
+              "code": "BCH 409",
+              "title": "Special Topics/Seminar in Biochemistry",
+              "creditUnits": 2,
+              "level": 400,
+              "semester": 1
+            },
+            {
+              "code": "BCH 410",
+              "title": "Advanced Biochemical Methods",
+              "creditUnits": 2,
+              "level": 400,
+              "semester": 1
+            },
+            {
+              "code": "BCH 411",
+              "title": "Research Project",
+              "creditUnits": 6,
+              "level": 400,
+              "semester": 1
+            },
+            {
+              "code": "BCH 413",
+              "title": "Toxicological and Pharmaceutical Biochemistry",
+              "creditUnits": 2,
+              "level": 400,
+              "semester": 1
+            },
+            {
+              "code": "BCH 415",
+              "title": "Advanced Molecular Biology",
+              "creditUnits": 2,
+              "level": 400,
+              "semester": 1
+            },
+            {
+              "code": "BCH 426",
+              "title": "Blood Biochemistry",
+              "creditUnits": 2,
+              "level": 400,
+              "semester": 1,
+              "elective": true
+            },
+            {
+              "code": "BCH 429",
+              "title": "Comparative Biochemistry",
+              "creditUnits": 2,
+              "level": 400,
+              "semester": 1,
+              "elective": true
+            },
+            {
+              "code": "BCH 403",
+              "title": "Tissue Biochemistry",
+              "creditUnits": 1,
+              "level": 400,
+              "semester": 2
+            },
+            {
+              "code": "BCH 405",
+              "title": "Biotechnology & Genetic Engineering",
+              "creditUnits": 3,
+              "level": 400,
+              "semester": 2
+            },
+            {
+              "code": "BCH 406",
+              "title": "Metabolic Regulations",
+              "creditUnits": 3,
+              "level": 400,
+              "semester": 2
+            },
+            {
+              "code": "BCH 407",
+              "title": "Plant Biochemistry",
+              "creditUnits": 2,
+              "level": 400,
+              "semester": 2
+            },
+            {
+              "code": "BCH 412",
+              "title": "Industrial Biochemistry",
+              "creditUnits": 3,
+              "level": 400,
+              "semester": 2
+            },
+            {
+              "code": "BCH 414",
+              "title": "Food and Nutritional Biochemistry",
+              "creditUnits": 2,
+              "level": 400,
+              "semester": 2
+            },
+            {
+              "code": "BCH 420",
+              "title": "Forensic Biochemistry",
+              "creditUnits": 2,
+              "level": 400,
+              "semester": 2,
+              "elective": true
+            },
+            {
+              "code": "BCH 425",
+              "title": "Enzyme Biotechnology",
+              "creditUnits": 1,
+              "level": 400,
+              "semester": 2,
+              "elective": true
+            },
+            {
+              "code": "BCH 427",
+              "title": "Parasite Biochemistry",
+              "creditUnits": 2,
+              "level": 400,
+              "semester": 2,
+              "elective": true
+            }
+          ],
+          "confidence": "confirmed",
+          "source": "Department of Biochemistry Student Handbook, University of Jos, 2021"
+        }
+      ]
+    }
+  ]
+}

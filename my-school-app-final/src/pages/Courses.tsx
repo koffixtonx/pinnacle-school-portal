@@ -44,11 +44,12 @@ interface CourseRow {
   title: string;
   code: string;
   description: string;
+  level?: string;
   teachers: Teacher[];
   _count: { enrollments: number };
 }
 
-const emptyForm = { title: '', code: '', description: '', teacherIds: [] as string[] };
+const emptyForm = { title: '', code: '', description: '', level: '100', teacherIds: [] as string[] };
 
 const Courses: React.FC = () => {
   const user = useCurrentUser();
@@ -107,6 +108,7 @@ const Courses: React.FC = () => {
       title: course.title,
       code: course.code,
       description: course.description,
+      level: course.level ?? '100',
       teacherIds: course.teachers.map((t) => t.id),
     });
     setDialogOpen(true);
@@ -120,7 +122,7 @@ const Courses: React.FC = () => {
         await academicsService.updateCourse(editingId, form);
         showSuccess('Course updated');
       } else {
-        await academicsService.createCourse(form.title, form.code, form.description, form.teacherIds);
+        await academicsService.createCourse(form.title, form.code, form.description, form.teacherIds, form.level);
         showSuccess('Course created');
       }
       setDialogOpen(false);
@@ -180,12 +182,15 @@ const Courses: React.FC = () => {
 
       <Grid container spacing={2}>
         {courses.map((course) => (
-          <Grid key={course.id} item xs={12} sm={6} md={4}>
+          <Grid key={course.id} xs={12} sm={6} md={4}>
             <Card sx={{ height: '100%', display: 'flex', flexDirection: 'column' }}>
               <CardContent sx={{ flexGrow: 1 }}>
                 <Box sx={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start' }}>
                   <Typography variant="h6">{course.title}</Typography>
-                  <Chip label={course.code} size="small" variant="outlined" />
+                  <Box sx={{ display: 'flex', gap: 0.5, flexWrap: 'wrap', justifyContent: 'flex-end' }}>
+                    <Chip label={`${course.level ?? '100'} Level`} size="small" color="primary" />
+                    <Chip label={course.code} size="small" variant="outlined" />
+                  </Box>
                 </Box>
                 <Typography variant="body2" color="text.secondary" sx={{ mt: 1, mb: 2 }}>
                   {course.description || 'No description yet.'}
@@ -219,7 +224,7 @@ const Courses: React.FC = () => {
           </Grid>
         ))}
         {courses.length === 0 && !loading && (
-          <Grid item xs={12}>
+          <Grid xs={12}>
             <Typography variant="body2" color="text.secondary">
               No courses yet.
             </Typography>
@@ -256,12 +261,28 @@ const Courses: React.FC = () => {
           />
           <TextField
             select
+            label="Course level"
+            fullWidth
+            margin="normal"
+            value={form.level}
+            onChange={(e) => setForm({ ...form, level: e.target.value })}
+          >
+            {['100', '200', '300', '400', '500'].map((level) => (
+              <MenuItem key={level} value={level}>{level} Level</MenuItem>
+            ))}
+          </TextField>
+          <TextField
+            select
             SelectProps={{ multiple: true }}
             label="Teachers"
             fullWidth
             margin="normal"
             value={form.teacherIds}
-            onChange={(e) => setForm({ ...form, teacherIds: e.target.value as unknown as string[] })}
+            onChange={(e) => {
+              const value = e.target.value;
+              const teacherIds = Array.isArray(value) ? value : String(value).split(',').filter(Boolean);
+              setForm({ ...form, teacherIds });
+            }}
           >
             {teachers.map((teacher) => (
               <MenuItem key={teacher.id} value={teacher.id}>

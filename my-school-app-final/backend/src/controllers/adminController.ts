@@ -76,7 +76,7 @@ export const AdminController = {
         orderBy: [{ createdAt: 'desc' }],
         take: limit + 1,
         ...(cursor ? { cursor: { createdAt: cursor.createdAt, id: '' }, skip: 1 } : {}),
-        select: { id: true, firstName: true, lastName: true, email: true, active: true, createdAt: true },
+        select: { id: true, firstName: true, lastName: true, email: true, active: true, studentStatus: true, admittedYear: true, studentLevel: true, department: { select: { id: true, name: true, code: true } }, createdAt: true },
       });
       const hasNextPage = students.length > limit;
       if (hasNextPage) students.pop();
@@ -277,11 +277,23 @@ export const AdminController = {
   async updateStudent(req: Request, res: Response, next: NextFunction) {
     try {
       const id = String(req.params.id);
-      const { firstName, lastName, email, active } = req.body as { firstName?: string; lastName?: string; email?: string; active?: boolean };
+      const tenantId = req.auth!.tenantId;
+      const { firstName, lastName, email, active, studentStatus, admittedYear, studentLevel, departmentId } = req.body as { firstName?: string; lastName?: string; email?: string; active?: boolean; studentStatus?: string; admittedYear?: number | null; studentLevel?: string; departmentId?: string | null };
+      if (studentStatus !== undefined && !['ACTIVE', 'INACTIVE', 'ON_PROBATION'].includes(studentStatus)) {
+        throw new ApiError(400, 'Student status must be ACTIVE, INACTIVE, or ON_PROBATION.');
+      }
+      if (studentLevel !== undefined && !['100', '200', '300', '400', '500'].includes(studentLevel)) {
+        throw new ApiError(400, 'Student level must be 100, 200, 300, 400, or 500.');
+      }
+      if (departmentId) {
+        const department = await prisma.department.findFirst({ where: { id: departmentId, tenantId } });
+        if (!department) throw new ApiError(404, 'Department not found.');
+      }
+      const nextActive = studentStatus === 'INACTIVE' ? false : studentStatus === 'ACTIVE' ? true : active;
       const user = await prisma.user.update({
-        where: { id },
-        data: { firstName, lastName, email, active },
-        select: { id: true, firstName: true, lastName: true, email: true, active: true, createdAt: true },
+        where: { id, tenantId, role: 'STUDENT' },
+        data: { firstName, lastName, email, active: nextActive, studentStatus, admittedYear, studentLevel, department: departmentId === null ? { disconnect: true } : departmentId ? { connect: { id: departmentId } } : undefined },
+        select: { id: true, firstName: true, lastName: true, email: true, active: true, studentStatus: true, admittedYear: true, studentLevel: true, department: { select: { id: true, name: true, code: true } }, createdAt: true },
       });
       res.json({ success: true, data: user });
     } catch (error) {
@@ -294,6 +306,55 @@ export const AdminController = {
       const id = String(req.params.id);
       await prisma.user.delete({ where: { id } });
       res.json({ success: true });
+    } catch (error) {
+      next(error);
+    }
+  },
+
+  async listDepartments(req: Request, res: Response, next: NextFunction) {
+    try {
+      const departments = await prisma.department.findMany({
+        where: { tenantId: req.auth!.tenantId },
+        orderBy: [{ faculty: { name: 'asc' } }, { name: 'asc' }],
+        include: { faculty: { select: { id: true, name: true } }, _count: { select: { students: true, courses: true } } },
+      });
+      res.json({ success: true, data: departments });
+    } catch (error) {
+      next(error);
+    }
+  },
+
+  async createFaculty(req: Request, res: Response, next: NextFunction) {
+    try {
+      const name = String(req.body.name ?? '').trim();
+      if (!name) throw new ApiError(422, 'Faculty name is required.');
+      const faculty = await prisma.faculty.create({ data: { tenantId: req.auth!.tenantId, name } });
+      res.status(201).json({ success: true, data: faculty });
+    } catch (error) {
+      next(error);
+    }
+  },
+
+  async createDepartment(req: Request, res: Response, next: NextFunction) {
+    try {
+      const tenantId = req.auth!.tenantId;
+      const name = String(req.body.name ?? '').trim();
+      const code = String(req.body.code ?? '').trim().toUpperCase();
+      const facultyId = String(req.body.facultyId ?? '');
+      if (!name || !code || !facultyId) throw new ApiError(422, 'Name, code, and faculty are required.');
+      const faculty = await prisma.faculty.findFirst({ where: { id: facultyId, tenantId } });
+      if (!faculty) throw new ApiError(404, 'Faculty not found.');
+      const department = await prisma.department.create({ data: { tenantId, facultyId, name, code }, include: { faculty: { select: { id: true, name: true } } } });
+      res.status(201).json({ success: true, data: department });
+    } catch (error) {
+      next(error);
+    }
+  },
+
+  async listFaculties(req: Request, res: Response, next: NextFunction) {
+    try {
+      const faculties = await prisma.faculty.findMany({ where: { tenantId: req.auth!.tenantId }, orderBy: { name: 'asc' }, include: { _count: { select: { departments: true } } } });
+      res.json({ success: true, data: faculties });
     } catch (error) {
       next(error);
     }

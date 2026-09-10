@@ -1,6 +1,10 @@
 import axios from 'axios';
 
-const API_BASE_URL = import.meta.env.VITE_API_BASE_URL || 'http://localhost:5000/api';
+const API_BASE_URL =
+  import.meta.env.VITE_API_BASE_URL ||
+  (typeof window !== 'undefined' && !['localhost', '127.0.0.1'].includes(window.location.hostname)
+    ? `${window.location.origin}/api`
+    : 'http://localhost:5000/api');
 
 // withCredentials so the httpOnly refreshToken cookie set by the backend
 // (see backend/src/controllers/authController.ts) is sent automatically.

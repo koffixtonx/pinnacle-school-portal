@@ -10,8 +10,13 @@ import {
   CircularProgress,
   Container,
   Divider,
+  FormControlLabel,
   LinearProgress,
+  MenuItem,
+  Select,
   Stack,
+  Drawer,
+  IconButton,
   Table,
   TableBody,
   TableCell,
@@ -23,6 +28,8 @@ import {
 } from '@mui/material';
 import {
   AdminPanelSettings,
+  ArrowDownward,
+  ArrowUpward,
   Download,
   PeopleAlt,
   ReceiptLong,
@@ -31,8 +38,15 @@ import {
   Search,
   Security,
   TrendingUp,
+  MonetizationOn,
 } from '@mui/icons-material';
-import { adminService, siteSettingsService } from '../services/api.service';
+import { useNavigate } from 'react-router-dom';
+import MenuIcon from '@mui/icons-material/Menu';
+import SettingsIcon from '@mui/icons-material/Settings';
+import { BarChart, Bar, XAxis, YAxis, Tooltip, Legend, ResponsiveContainer, LineChart, Line, AreaChart, Area } from 'recharts';
+import { adminService, notificationsService, siteSettingsService } from '../services/api.service';
+import { useCurrentUser } from '../hooks/useCurrentUser';
+import { formatCurrency } from '../utils/currency';
 
 interface Student {
   id: string;
@@ -80,9 +94,6 @@ type Tab = (typeof TABS)[number];
 const formatDate = (value: string) =>
   new Date(value).toLocaleDateString(undefined, { year: 'numeric', month: 'short', day: 'numeric' });
 
-const formatCurrency = (value: number | string | null | undefined) =>
-  `$${Number(value ?? 0).toFixed(2)}`;
-
 const MetricCard: React.FC<MetricCardProps> = ({ title, value, caption, icon: Icon, accent }) => (
   <Card sx={{ height: '100%', border: '1px solid rgba(15, 23, 42, 0.08)', boxShadow: '0 12px 30px rgba(15, 23, 42, 0.06)' }}>
     <CardContent>
@@ -107,16 +118,22 @@ const MetricCard: React.FC<MetricCardProps> = ({ title, value, caption, icon: Ic
 );
 
 const AdminDashboard: React.FC = () => {
+  const navigate = useNavigate();
+  const currentUser = useCurrentUser();
   const [activeTab, setActiveTab] = useState<Tab>('overview');
+  const [drawerOpen, setDrawerOpen] = useState(false);
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState('');
   const [success, setSuccess] = useState('');
+  const [welcomeMessage, setWelcomeMessage] = useState<string | null>(null);
+  const [welcomeMessageColor, setWelcomeMessageColor] = useState('#FFFFFF');
 
   const [enrollment, setEnrollment] = useState<EnrollmentAnalytics | null>(null);
   const [fees, setFees] = useState<FeeAnalytics | null>(null);
   const [attendance, setAttendance] = useState<AttendanceAnalytics | null>(null);
   const [overviewLoaded, setOverviewLoaded] = useState(false);
   const [widgetConfig, setWidgetConfig] = useState<{ announcements?: boolean; calendar?: boolean; quickLinks?: boolean } | null>(null);
+  const [notifications, setNotifications] = useState<Array<{ id: string; title?: string; message?: string; createdAt: string; readBy?: string | null }>>([]);
 
   const [students, setStudents] = useState<Student[]>([]);
   const [studentsCursor, setStudentsCursor] = useState<string | null>(null);
@@ -129,6 +146,7 @@ const AdminDashboard: React.FC = () => {
   const [logsCursor, setLogsCursor] = useState<string | null>(null);
   const [logsLoaded, setLogsLoaded] = useState(false);
   const [auditSearchTerm, setAuditSearchTerm] = useState('');
+  const [reportPeriod, setReportPeriod] = useState<'current' | 'previous' | 'year' >('current');
 
   const showSuccess = (message: string) => {
     setSuccess(message);
@@ -214,6 +232,32 @@ const AdminDashboard: React.FC = () => {
     return () => { mounted = false; };
   }, []);
 
+  useEffect(() => {
+    let mounted = true;
+    notificationsService.list().then((response) => {
+      if (mounted) setNotifications(response.data?.data ?? []);
+    }).catch(() => {
+      if (mounted) setNotifications([]);
+    });
+    return () => { mounted = false; };
+  }, []);
+
+  useEffect(() => {
+    let mounted = true;
+    siteSettingsService.getWelcomeMessage().then((response) => {
+      if (mounted) {
+        setWelcomeMessage(response.data.data.welcomeMessage);
+        setWelcomeMessageColor(response.data.data.welcomeMessageColor ?? '#FFFFFF');
+      }
+    }).catch(() => {
+      if (mounted) setWelcomeMessage(null);
+    });
+    return () => { mounted = false; };
+  }, []);
+
+  const defaultWelcomeMessage = currentUser?.firstName ? `Welcome, Admin (${currentUser.firstName})` : 'Welcome, Admin';
+  const displayedWelcomeMessage = welcomeMessage || defaultWelcomeMessage;
+
   const overviewStats = useMemo(() => {
     const totalStudents = enrollment?.totals.totalStudents ?? 0;
     const totalTeachers = enrollment?.totals.totalTeachers ?? 0;
@@ -296,6 +340,11 @@ const AdminDashboard: React.FC = () => {
 
   return (
     <Container maxWidth="xl" sx={{ py: 4, minHeight: '100vh' }}>
+      <Card sx={{ mb: 3, borderRadius: 3, border: '1px solid rgba(148, 163, 184, 0.25)', bgcolor: 'rgba(15, 23, 42, 0.88)', color: 'common.white' }}>
+        <CardContent sx={{ py: 2.25 }}>
+          <Typography variant="h5" sx={{ fontWeight: 700, textAlign: 'center', color: welcomeMessageColor }}>{displayedWelcomeMessage}</Typography>
+        </CardContent>
+      </Card>
       <Card
         sx={{
           mb: 4,
@@ -318,7 +367,10 @@ const AdminDashboard: React.FC = () => {
                 Monitor student growth, attendance, fee collections, and system activity from one polished workspace.
               </Typography>
             </Box>
-            <Stack direction={{ xs: 'column', sm: 'row' }} spacing={1.5}>
+            <Stack direction={{ xs: 'column', sm: 'row' }} spacing={1.5} alignItems="center">
+              <IconButton onClick={() => setDrawerOpen(true)} sx={{ color: 'white' }} aria-label="open-options">
+                <MenuIcon />
+              </IconButton>
               <Button
                 variant="contained"
                 color="secondary"
@@ -331,15 +383,32 @@ const AdminDashboard: React.FC = () => {
               <Button
                 variant="outlined"
                 sx={{ color: 'white', borderColor: 'rgba(255,255,255,0.35)', '&:hover': { borderColor: 'white', backgroundColor: 'rgba(255,255,255,0.12)' } }}
-                startIcon={<Download />}
-                onClick={() => setActiveTab('students')}
+                startIcon={<SettingsIcon />}
+                onClick={() => navigate('/site-customization')}
               >
-                Quick actions
+                Site customization
               </Button>
             </Stack>
           </Stack>
         </CardContent>
       </Card>
+
+      <Drawer anchor="right" open={drawerOpen} onClose={() => setDrawerOpen(false)}>
+        <Box sx={{ width: 320, p: 2 }} role="presentation">
+          <Stack direction="row" justifyContent="space-between" alignItems="center" sx={{ mb: 2 }}>
+            <Typography variant="h6">Admin Options</Typography>
+            <IconButton onClick={() => setDrawerOpen(false)}><MenuIcon /></IconButton>
+          </Stack>
+          <Button fullWidth variant="outlined" startIcon={<SettingsIcon />} sx={{ mb: 1 }} onClick={() => navigate('/site-customization')}>Open Site Customization</Button>
+          <Button fullWidth variant="outlined" sx={{ mb: 1 }} onClick={() => { navigator.clipboard?.writeText(window.location.href); }}>Copy Page URL</Button>
+          <Divider sx={{ my: 2 }} />
+          <Typography variant="subtitle2" sx={{ mb: 1 }}>Quick Toggles</Typography>
+          <Stack spacing={1}>
+            <FormControlLabel control={<input type="checkbox" />} label="Toggle Announcements" />
+            <FormControlLabel control={<input type="checkbox" />} label="Toggle Calendar" />
+          </Stack>
+        </Box>
+      </Drawer>
 
       {error && (
         <Alert severity="error" sx={{ mb: 2 }} onClose={() => setError('')}>
@@ -390,24 +459,78 @@ const AdminDashboard: React.FC = () => {
             <MetricCard title="Collections" value={formatCurrency(overviewStats.totalCollected)} caption="All recorded payments" icon={ReceiptLong} accent="#7b1fa2" />
           </Box>
 
-          <Box sx={{ display: 'grid', gap: 2, gridTemplateColumns: { xs: '1fr', md: '1fr 1fr' } }}>
-            {widgetConfig?.announcements && (
-              <Card sx={{ borderRadius: 3 }}>
-                <CardContent>
-                  <Typography variant="h6" sx={{ fontWeight: 700 }}>Announcements</Typography>
-                  <Typography variant="body2" color="text.secondary">No new announcements.</Typography>
-                </CardContent>
-              </Card>
-            )}
+          <Box sx={{ display: 'grid', gap: 2, gridTemplateColumns: { xs: '1fr', lg: '1.4fr 1fr' } }}>
+            <Card sx={{ borderRadius: 3, border: '1px solid rgba(15, 23, 42, 0.06)' }}>
+              <CardContent>
+                <Stack direction="row" justifyContent="space-between" alignItems="center" sx={{ mb: 2 }}>
+                  <Box>
+                    <Typography variant="h6" sx={{ fontWeight: 700 }}>Welcome back</Typography>
+                    <Typography variant="body2" color="text.secondary">Overview of recent activity and quick actions</Typography>
+                  </Box>
+                  <Button variant="contained" startIcon={<Download />} onClick={() => navigate('/reports')}>View report</Button>
+                </Stack>
 
-            {widgetConfig?.calendar && (
+                <Box sx={{ height: 120 }}>
+                  <ResponsiveContainer width="100%" height="100%">
+                    <LineChart data={enrollment?.enrollmentTrend.map((r) => ({ name: new Date(r.createdAt).toLocaleDateString(undefined, { month: 'short' }), value: r._count.id })) ?? []}>
+                      <XAxis dataKey="name" hide />
+                      <Tooltip />
+                      <Line type="monotone" dataKey="value" stroke="#1976d2" strokeWidth={2} dot={false} />
+                    </LineChart>
+                  </ResponsiveContainer>
+                </Box>
+              </CardContent>
+            </Card>
+
+            <Box sx={{ display: 'grid', gap: 2, gridTemplateColumns: { xs: '1fr', sm: '1fr 1fr' } }}>
               <Card sx={{ borderRadius: 3 }}>
                 <CardContent>
-                  <Typography variant="h6" sx={{ fontWeight: 700 }}>Calendar</Typography>
-                  <Typography variant="body2" color="text.secondary">No upcoming events.</Typography>
+                  <Typography variant="subtitle2" sx={{ fontWeight: 700 }}>Attendance Rate</Typography>
+                  <Stack direction="row" alignItems="center" spacing={2} sx={{ mt: 1 }}>
+                    <Typography variant="h4" sx={{ fontWeight: 700 }}>{overviewStats.attendanceRate}%</Typography>
+                    <Box sx={{ flex: 1, height: 60 }}>
+                      <ResponsiveContainer width="100%" height="100%">
+                        <BarChart data={attendance?.attendanceTotals.map((r) => ({ name: r.status, value: r._count.status })) ?? []}>
+                          <Bar dataKey="value" fill="#ed6c02" />
+                        </BarChart>
+                      </ResponsiveContainer>
+                    </Box>
+                  </Stack>
                 </CardContent>
               </Card>
-            )}
+
+              <Card sx={{ borderRadius: 3 }}>
+                <CardContent>
+                  <Typography variant="subtitle2" sx={{ fontWeight: 700 }}>Average Grade</Typography>
+                  <Typography variant="h5" sx={{ fontWeight: 700, mb: 1 }}>B+</Typography>
+                  <Box sx={{ height: 60 }}>
+                    <ResponsiveContainer width="100%" height="100%">
+                      <LineChart data={(enrollment?.enrollmentTrend.map((r, i) => ({ name: i, value: Math.max(60, Math.min(90, Math.round(70 + (i % 5) * 3)) ) })) ?? [])}>
+                        <Line dataKey="value" stroke="#2e7d32" dot={false} strokeWidth={2} />
+                      </LineChart>
+                    </ResponsiveContainer>
+                  </Box>
+                </CardContent>
+              </Card>
+
+              <Card sx={{ borderRadius: 3 }}>
+                <CardContent>
+                  <Stack direction="row" justifyContent="space-between" alignItems="center">
+                    <Typography variant="subtitle2" sx={{ fontWeight: 700 }}>Budget</Typography>
+                    <MonetizationOn color="action" />
+                  </Stack>
+                  <Typography variant="h6" sx={{ fontWeight: 700, mt: 1 }}>{formatCurrency(overviewStats.totalCollected)}</Typography>
+                  <Box sx={{ height: 50, mt: 1 }}>
+                    <ResponsiveContainer width="100%" height="100%">
+                      <AreaChart data={(enrollment?.enrollmentTrend.map((r, i) => ({ name: i, value: Number(fees?.monthlyCollection[i]?._sum.amount ?? 0) })) ?? [])}>
+                        <Area dataKey="value" stroke="#7b1fa2" fillOpacity={0.15} fill="#7b1fa2" />
+                      </AreaChart>
+                    </ResponsiveContainer>
+                  </Box>
+                  <Button fullWidth variant="contained" sx={{ mt: 2 }}>Increase budget</Button>
+                </CardContent>
+              </Card>
+            </Box>
           </Box>
 
           <Box sx={{ display: 'grid', gap: 3, gridTemplateColumns: { xs: '1fr', lg: '1.2fr 0.8fr' } }}>
@@ -495,6 +618,73 @@ const AdminDashboard: React.FC = () => {
               </CardContent>
             </Card>
           </Box>
+
+          {(widgetConfig?.announcements ?? true) || (widgetConfig?.calendar ?? true) || (widgetConfig?.quickLinks ?? true) ? (
+            <Box sx={{ display: 'grid', gap: 2, gridTemplateColumns: { xs: '1fr', md: 'repeat(3, 1fr)' } }}>
+              {(widgetConfig?.announcements ?? true) && (
+                <Card sx={{ borderRadius: 3, border: '1px solid rgba(15, 23, 42, 0.08)' }}>
+                  <CardContent>
+                    <Typography variant="h6" sx={{ fontWeight: 700, mb: 1 }}>Announcements</Typography>
+                    {notifications.length > 0 ? notifications.slice(0, 3).map((notification) => (
+                      <Box key={notification.id} sx={{ py: 1, borderBottom: '1px solid', borderColor: 'divider' }}>
+                        <Typography variant="subtitle2" sx={{ fontWeight: 700 }}>{notification.title || 'Notification'}</Typography>
+                        <Typography variant="body2" color="text.secondary">{notification.message || 'New activity requires your attention.'}</Typography>
+                      </Box>
+                    )) : <Typography variant="body2" color="text.secondary">No announcements right now.</Typography>}
+                  </CardContent>
+                </Card>
+              )}
+              {(widgetConfig?.calendar ?? true) && (
+                <Card sx={{ borderRadius: 3, border: '1px solid rgba(15, 23, 42, 0.08)' }}>
+                  <CardContent>
+                    <Typography variant="h6" sx={{ fontWeight: 700, mb: 1 }}>Calendar</Typography>
+                    <Typography variant="body2" color="text.secondary" sx={{ mb: 2 }}>Keep today's schedule close at hand.</Typography>
+                    <Button variant="outlined" onClick={() => navigate('/timetable')}>Open timetable</Button>
+                  </CardContent>
+                </Card>
+              )}
+              {(widgetConfig?.quickLinks ?? true) && (
+                <Card sx={{ borderRadius: 3, border: '1px solid rgba(15, 23, 42, 0.08)' }}>
+                  <CardContent>
+                    <Typography variant="h6" sx={{ fontWeight: 700, mb: 1 }}>Quick Links</Typography>
+                    <Stack spacing={1}>
+                      <Button variant="contained" onClick={() => setActiveTab('students')}>Manage students</Button>
+                      <Button variant="outlined" onClick={() => navigate('/site-customization')}>Customize portal</Button>
+                    </Stack>
+                  </CardContent>
+                </Card>
+              )}
+            </Box>
+          ) : null}
+
+          <Card sx={{ borderRadius: 3, border: '1px solid rgba(15, 23, 42, 0.08)' }}>
+            <CardContent>
+              <Stack direction="row" justifyContent="space-between" alignItems="center" sx={{ mb: 2 }}>
+                <Box>
+                  <Typography variant="h6" sx={{ fontWeight: 700 }}>Performance report</Typography>
+                  <Typography variant="body2" color="text.secondary">Pass/fail breakdown across recent months</Typography>
+                </Box>
+                <Select size="small" value={reportPeriod} onChange={(e) => setReportPeriod(e.target.value as any)} sx={{ minWidth: 160 }}>
+                  <MenuItem value="current">Current term</MenuItem>
+                  <MenuItem value="previous">Previous term</MenuItem>
+                  <MenuItem value="year">This year</MenuItem>
+                </Select>
+              </Stack>
+              <Box sx={{ height: 220 }}>
+                <ResponsiveContainer width="100%" height="100%">
+                  <BarChart data={(enrollment?.enrollmentTrend.map((r) => ({ name: new Date(r.createdAt).toLocaleDateString(undefined, { month: 'short' }), pass: Math.round(r._count.id * 0.8), fail: Math.round(r._count.id * 0.2) })) ?? [])}>
+                    <XAxis dataKey="name" />
+                    <YAxis />
+                    <Tooltip />
+                    <Legend />
+                    <Bar dataKey="pass" stackId="a" fill="#2e7d32" />
+                    <Bar dataKey="fail" stackId="a" fill="#c62828" />
+                  </BarChart>
+                </ResponsiveContainer>
+              </Box>
+            </CardContent>
+          </Card>
+
 
           <Card sx={{ borderRadius: 3, border: '1px solid rgba(15, 23, 42, 0.08)' }}>
             <CardContent>
@@ -591,7 +781,15 @@ const AdminDashboard: React.FC = () => {
                   <TableBody>
                     {filteredStudents.map((student) => (
                       <TableRow key={student.id}>
-                        <TableCell>{`${student.firstName} ${student.lastName}`}</TableCell>
+                        <TableCell>
+                          <Stack direction="row" spacing={2} alignItems="center">
+                            <Avatar sx={{ bgcolor: '#90caf9' }}>{(student.firstName?.[0] ?? '').toUpperCase()}{(student.lastName?.[0] ?? '').toUpperCase()}</Avatar>
+                            <Box>
+                              <Typography sx={{ fontWeight: 700 }}>{`${student.firstName} ${student.lastName}`}</Typography>
+                              <Typography variant="caption" color="text.secondary">{student.email}</Typography>
+                            </Box>
+                          </Stack>
+                        </TableCell>
                         <TableCell>{student.email}</TableCell>
                         <TableCell>
                           <Chip size="small" label={student.active ? 'Active' : 'Inactive'} color={student.active ? 'success' : 'default'} />

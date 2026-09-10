@@ -11,6 +11,58 @@ function requireAdmin(role: string) {
 }
 
 export const AcademicsController = {
+  async listCourseHierarchy(req: Request, res: Response, next: NextFunction) {
+    try {
+      const faculties = await prisma.faculty.findMany({
+        where: { tenantId: req.auth!.tenantId },
+        orderBy: { name: 'asc' },
+        include: {
+          departments: {
+            orderBy: { name: 'asc' },
+            include: { courses: { orderBy: [{ level: 'asc' }, { code: 'asc' }] } },
+          },
+        },
+      });
+      res.json({ success: true, data: faculties });
+    } catch (error) { next(error); }
+  },
+
+  async listDepartmentTimetable(req: Request, res: Response, next: NextFunction) {
+    try {
+      const slots = await prisma.departmentTimetableSlot.findMany({
+        where: { tenantId: req.auth!.tenantId },
+        orderBy: [{ dayOfWeek: 'asc' }, { startHour: 'asc' }],
+        include: { course: { select: { id: true, code: true, title: true } }, department: { select: { id: true, name: true, confidence: true } } },
+      });
+      res.json({ success: true, data: slots });
+    } catch (error) { next(error); }
+  },
+
+  async createDepartmentTimetableSlot(req: Request, res: Response, next: NextFunction) {
+    try {
+      requireAdmin(req.auth!.role);
+      const { courseId, departmentId, dayOfWeek, startHour } = req.body as { courseId: string; departmentId: string; dayOfWeek: number; startHour: number };
+      if (!courseId || !departmentId || !Number.isInteger(dayOfWeek) || !Number.isInteger(startHour)) throw new ApiError(422, 'courseId, departmentId, dayOfWeek and startHour are required.');
+      if (dayOfWeek < 1 || dayOfWeek > 5 || ![8, 10, 12, 14, 16].includes(startHour)) throw new ApiError(422, 'Choose a weekday and one of the fixed two-hour periods from 08:00 to 18:00.');
+      const course = await prisma.course.findFirst({ where: { id: courseId, tenantId: req.auth!.tenantId, departmentId } });
+      if (!course) throw new ApiError(422, 'The selected course must belong to the selected department.');
+      const occupied = await prisma.departmentTimetableSlot.findUnique({ where: { tenantId_dayOfWeek_startHour: { tenantId: req.auth!.tenantId, dayOfWeek, startHour } } });
+      if (occupied) throw new ApiError(409, 'This day and time slot is already assigned to another course.');
+      const slot = await prisma.departmentTimetableSlot.create({ data: { tenantId: req.auth!.tenantId, courseId, departmentId, dayOfWeek, startHour }, include: { course: { select: { id: true, code: true, title: true } }, department: { select: { id: true, name: true, confidence: true } } } });
+      res.status(201).json({ success: true, data: slot });
+    } catch (error) { next(error); }
+  },
+
+  async deleteDepartmentTimetableSlot(req: Request, res: Response, next: NextFunction) {
+    try {
+      requireAdmin(req.auth!.role);
+      const slot = await prisma.departmentTimetableSlot.findFirst({ where: { id: req.params.id, tenantId: req.auth!.tenantId } });
+      if (!slot) throw new ApiError(404, 'Timetable assignment not found.');
+      await prisma.departmentTimetableSlot.delete({ where: { id: slot.id } });
+      res.json({ success: true });
+    } catch (error) { next(error); }
+  },
+
   // ---------- Courses ----------
   async listCourses(req: Request, res: Response, next: NextFunction) {
     try {
@@ -39,14 +91,20 @@ export const AcademicsController = {
   async createCourse(req: Request, res: Response, next: NextFunction) {
     try {
       requireAdmin(req.auth!.role);
-      const { title, code, description, teacherIds } = req.body as {
+      const { title, code, description, teacherIds, level, departmentId } = req.body as {
         title: string;
         code: string;
         description: string;
         teacherIds?: string[];
+        level?: string;
+        departmentId?: string | null;
       };
       if (!title || !code) {
         throw new ApiError(422, 'title and code are required.');
+      }
+      if (departmentId) {
+        const department = await prisma.department.findFirst({ where: { id: departmentId, tenantId: req.auth!.tenantId } });
+        if (!department) throw new ApiError(404, 'Department not found.');
       }
       const course = await prisma.course.create({
         data: {
@@ -54,6 +112,8 @@ export const AcademicsController = {
           title,
           code,
           description: description ?? '',
+          level: level ?? '100',
+          departmentId: departmentId ?? null,
           teachers: teacherIds?.length ? { connect: teacherIds.map((id) => ({ id })) } : undefined,
         },
         include: { teachers: { select: { id: true, firstName: true, lastName: true } } },
@@ -68,11 +128,13 @@ export const AcademicsController = {
     try {
       requireAdmin(req.auth!.role);
       const { id } = req.params;
-      const { title, code, description, teacherIds } = req.body as {
+      const { title, code, description, teacherIds, level, departmentId } = req.body as {
         title?: string;
         code?: string;
         description?: string;
         teacherIds?: string[];
+        level?: string;
+        departmentId?: string | null;
       };
       const course = await prisma.course.update({
         where: { id },
@@ -80,6 +142,8 @@ export const AcademicsController = {
           ...(title !== undefined ? { title } : {}),
           ...(code !== undefined ? { code } : {}),
           ...(description !== undefined ? { description } : {}),
+          ...(level !== undefined ? { level } : {}),
+          ...(departmentId === null ? { department: { disconnect: true } } : departmentId ? { department: { connect: { id: departmentId } } } : {}),
           ...(teacherIds ? { teachers: { set: teacherIds.map((tid) => ({ id: tid })) } } : {}),
         },
         include: { teachers: { select: { id: true, firstName: true, lastName: true } } },
@@ -137,6 +201,60 @@ export const AcademicsController = {
     } catch (error) {
       next(error);
     }
+  },
+
+  async listAvailableCourses(req: Request, res: Response, next: NextFunction) {
+    try {
+      const courses = await prisma.course.findMany({
+        where: { tenantId: req.auth!.tenantId },
+        orderBy: [{ level: 'asc' }, { title: 'asc' }],
+        include: {
+          teachers: { select: { id: true, firstName: true, lastName: true } },
+          enrollments: { where: { studentId: req.auth!.userId }, select: { id: true, status: true } },
+        },
+      });
+      res.json({ success: true, data: courses });
+    } catch (error) { next(error); }
+  },
+
+  async requestCourseEnrollment(req: Request, res: Response, next: NextFunction) {
+    try {
+      const courseId = String(req.params.id);
+      const course = await prisma.course.findFirst({ where: { id: courseId, tenantId: req.auth!.tenantId } });
+      if (!course) throw new ApiError(404, 'Course not found.');
+      const enrollment = await prisma.enrollment.upsert({
+        where: { studentId_courseId: { studentId: req.auth!.userId, courseId } },
+        update: { status: 'PENDING' },
+        create: { tenantId: req.auth!.tenantId, studentId: req.auth!.userId, courseId, status: 'PENDING' },
+      });
+      res.status(201).json({ success: true, data: enrollment });
+    } catch (error) { next(error); }
+  },
+
+  async listPendingEnrollments(req: Request, res: Response, next: NextFunction) {
+    try {
+      const enrollments = await prisma.enrollment.findMany({
+        where: { tenantId: req.auth!.tenantId, status: 'PENDING', course: { teachers: { some: { id: req.auth!.userId } } } },
+        orderBy: { createdAt: 'asc' },
+        include: {
+          course: { select: { id: true, title: true, code: true, level: true } },
+          student: { select: { id: true, firstName: true, lastName: true, email: true } },
+        },
+      });
+      res.json({ success: true, data: enrollments });
+    } catch (error) { next(error); }
+  },
+
+  async reviewEnrollment(req: Request, res: Response, next: NextFunction) {
+    try {
+      const enrollmentId = String(req.params.id);
+      const status = String(req.body.status ?? '');
+      if (!['ACTIVE', 'REJECTED'].includes(status)) throw new ApiError(400, 'Status must be ACTIVE or REJECTED.');
+      const enrollment = await prisma.enrollment.findFirst({ where: { id: enrollmentId, tenantId: req.auth!.tenantId, status: 'PENDING', course: { teachers: { some: { id: req.auth!.userId } } } } });
+      if (!enrollment) throw new ApiError(404, 'Pending enrollment not found.');
+      const updated = await prisma.enrollment.update({ where: { id: enrollmentId }, data: { status } });
+      res.json({ success: true, data: updated });
+    } catch (error) { next(error); }
   },
 
   // ---------- Class sections ----------

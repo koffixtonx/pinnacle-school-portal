@@ -26,6 +26,7 @@ import PaymentIcon from '@mui/icons-material/Payment';
 import DeleteIcon from '@mui/icons-material/Delete';
 import { adminService, feesService } from '../services/api.service';
 import { isAdminRole, useCurrentUser } from '../hooks/useCurrentUser';
+import { formatCurrency } from '../utils/currency';
 
 interface Student {
   id: string;
@@ -205,8 +206,8 @@ const Fees: React.FC = () => {
                     </TableCell>
                   )}
                   <TableCell>{new Date(invoice.dueDate).toLocaleDateString()}</TableCell>
-                  <TableCell align="right">${Number(invoice.totalAmount).toFixed(2)}</TableCell>
-                  <TableCell align="right">${Number(invoice.paidAmount).toFixed(2)}</TableCell>
+                  <TableCell align="right">{formatCurrency(invoice.totalAmount)}</TableCell>
+                  <TableCell align="right">{formatCurrency(invoice.paidAmount)}</TableCell>
                   <TableCell>
                     <Chip label={invoice.status} size="small" color={STATUS_COLOR[invoice.status] || 'default'} />
                   </TableCell>
@@ -279,7 +280,7 @@ const Fees: React.FC = () => {
                 onChange={(e) => updateLine(index, 'description', e.target.value)}
               />
               <TextField
-                label="Amount"
+                label="Amount (₦)"
                 type="number"
                 size="small"
                 sx={{ width: 140 }}
@@ -311,7 +312,7 @@ const Fees: React.FC = () => {
         <DialogTitle>Record Payment</DialogTitle>
         <DialogContent>
           <TextField
-            label="Amount"
+            label="Amount (₦)"
             type="number"
             fullWidth
             margin="normal"

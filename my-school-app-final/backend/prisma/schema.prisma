@@ -1,5 +1,6 @@
 generator client {
   provider = "prisma-client-js"
+  engineType = "library"
 }
 
 datasource db {
@@ -30,6 +31,9 @@ model Tenant {
   auditLogs        AuditLog[]
   bulkJobs         BulkImportJob[]
   siteSettings     SiteSettings?
+  faculties        Faculty[]
+  departments      Department[]
+  departmentTimetableSlots DepartmentTimetableSlot[]
 
   @@index([status])
 }
@@ -43,7 +47,13 @@ model User {
   role                String
   firstName           String
   lastName            String
+  phone               String?
   active              Boolean              @default(true)
+  studentStatus       String               @default("ACTIVE")
+  admittedYear        Int?
+  studentLevel        String               @default("100")
+  department          Department?          @relation("departmentStudents", fields: [departmentId], references: [id], onDelete: SetNull)
+  departmentId        String?
   createdAt           DateTime             @default(now())
   updatedAt           DateTime             @updatedAt
   refreshTokens       RefreshToken[]
@@ -105,14 +115,21 @@ model Course {
   title         String
   code          String
   description   String
+  level         String        @default("100")
+  creditUnits   Int?
+  semester      Int?
+  elective      Boolean       @default(false)
   teachers      User[]          @relation("courseTeachers")
   enrollments   Enrollment[]
   gradePeriods  GradePeriod[]
   timetableSlots TimetableSlot[]
+  departmentTimetableSlots DepartmentTimetableSlot[]
+  department    Department?   @relation("departmentCourses", fields: [departmentId], references: [id], onDelete: SetNull)
+  departmentId  String?
   createdAt     DateTime        @default(now())
   updatedAt     DateTime        @updatedAt
 
-  @@unique([tenantId, code])
+  @@unique([tenantId, departmentId, code])
   @@index([tenantId])
 }
 
@@ -135,6 +152,40 @@ model Enrollment {
   @@index([studentId])
 }
 
+model Faculty {
+  id          String       @id @default(uuid())
+  tenant      Tenant       @relation(fields: [tenantId], references: [id], onDelete: Cascade)
+  tenantId    String
+  name        String
+  departments Department[]
+  createdAt   DateTime     @default(now())
+  updatedAt   DateTime     @updatedAt
+
+  @@unique([tenantId, name])
+  @@index([tenantId])
+}
+
+model Department {
+  id          String    @id @default(uuid())
+  tenant      Tenant    @relation(fields: [tenantId], references: [id], onDelete: Cascade)
+  tenantId    String
+  faculty     Faculty   @relation(fields: [facultyId], references: [id], onDelete: Cascade)
+  facultyId   String
+  name        String
+  code        String
+  confidence  String    @default("unresearched")
+  source      String?
+  students    User[]    @relation("departmentStudents")
+  courses     Course[]  @relation("departmentCourses")
+  timetableSlots DepartmentTimetableSlot[]
+  createdAt   DateTime  @default(now())
+  updatedAt   DateTime  @updatedAt
+
+  @@unique([tenantId, code])
+  @@index([tenantId])
+  @@index([facultyId])
+}
+
 model TimetableSlot {
   id             String       @id @default(uuid())
   tenant         Tenant       @relation(fields: [tenantId], references: [id], onDelete: Cascade)
@@ -154,6 +205,24 @@ model TimetableSlot {
 
   @@index([tenantId])
   @@index([classSectionId])
+}
+
+model DepartmentTimetableSlot {
+  id           String     @id @default(uuid())
+  tenant       Tenant     @relation(fields: [tenantId], references: [id], onDelete: Cascade)
+  tenantId     String
+  department   Department @relation(fields: [departmentId], references: [id], onDelete: Cascade)
+  departmentId String
+  course       Course     @relation(fields: [courseId], references: [id], onDelete: Cascade)
+  courseId     String
+  dayOfWeek    Int
+  startHour    Int
+  createdAt    DateTime   @default(now())
+  updatedAt    DateTime   @updatedAt
+
+  @@unique([tenantId, dayOfWeek, startHour])
+  @@index([tenantId, departmentId])
+  @@index([courseId])
 }
 
 model AttendanceRecord {
@@ -341,6 +410,9 @@ model SiteSettings {
   primaryColor  String?  @default("#1976D2")
   secondaryColor String?
   widgetConfig  String?  @default("{\"announcements\":true,\"calendar\":true,\"quickLinks\":true}")
+  welcomeMessage String?
+  welcomeMessageColor String? @default("#FFFFFF")
+  welcomeBackgroundImages String? @default("[]")
   createdAt     DateTime @default(now())
   updatedAt     DateTime @updatedAt
 

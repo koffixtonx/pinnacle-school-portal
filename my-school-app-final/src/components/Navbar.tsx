@@ -190,7 +190,7 @@ const Navbar: React.FC = () => {
             </SearchIconWrapper>
             <StyledInputBase
               placeholder="Search..."
-              inputProps={{ "aria-label": "search" }}
+              slotProps={{ input: { 'aria-label': 'search' } }}
             />
           </Search>
           <Box sx={{ flexGrow: 1 }} />

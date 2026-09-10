@@ -1,22 +1,28 @@
 import React from 'react';
 import { BrowserRouter, Routes, Route, Navigate } from "react-router-dom";
 import { ThemeProvider } from '@mui/material/styles';
-import AdminDashboard from "./pages/AdminDashboard";
-import Home from "./pages/Home";
-import Students from "./pages/Students";
-import Teachers from "./pages/Teachers";
-import Courses from "./pages/Courses";
-import Settings from "./pages/Settings";
-import SiteCustomization from './pages/SiteCustomization';
-import Login from "./pages/Login";
-import Register from "./pages/Register";
 import DrawerAppBar from "./components/DrawerAppBar";
 import getTheme from "./theme";
-import Timetable from './pages/Timetable';
-import Attendance from './pages/Attendance';
-import Grades from './pages/Grades';
-import Fees from './pages/Fees';
 import { useCurrentUser, type Role } from './hooks/useCurrentUser';
+
+const AdminDashboard = React.lazy(() => import('./pages/AdminDashboard'));
+const TeacherDashboard = React.lazy(() => import('./pages/TeacherDashboard'));
+const StudentDashboard = React.lazy(() => import('./pages/StudentDashboard'));
+const Home = React.lazy(() => import('./pages/Home'));
+const Welcome = React.lazy(() => import('./pages/Welcome'));
+const Students = React.lazy(() => import('./pages/Students'));
+const Teachers = React.lazy(() => import('./pages/Teachers'));
+const Courses = React.lazy(() => import('./pages/Courses'));
+const Settings = React.lazy(() => import('./pages/Settings'));
+const SiteCustomization = React.lazy(() => import('./pages/SiteCustomization'));
+const Login = React.lazy(() => import('./pages/Login'));
+const Register = React.lazy(() => import('./pages/Register'));
+const Timetable = React.lazy(() => import('./pages/Timetable'));
+const Attendance = React.lazy(() => import('./pages/Attendance'));
+const Grades = React.lazy(() => import('./pages/Grades'));
+const Fees = React.lazy(() => import('./pages/Fees'));
+const Departments = React.lazy(() => import('./pages/Departments'));
+const CourseCatalog = React.lazy(() => import('./pages/CourseCatalog'));
 
 // Protected Route Component: requires login, and (if roles is given) requires
 // the current user's role to be one of the allowed roles.
@@ -35,14 +41,23 @@ const ProtectedRoute: React.FC<{ children: React.ReactNode; roles?: Role[] }> = 
 };
 
 function App() {
-  const [isAuthenticated, setIsAuthenticated] = React.useState(
-    () => !!localStorage.getItem('user') && !!localStorage.getItem('accessToken')
-  );
+  const currentUser = useCurrentUser();
+  const canAccessProtectedSiteSettings = !!currentUser && ['SUPER_ADMIN', 'SCHOOL_ADMIN'].includes(currentUser.role);
+  const getRoleDashboardPath = (role?: Role) => {
+    // Keep the welcome page as the landing destination after login, while preserving direct dashboard routes.
+    return '/';
+  };
+
+  const [authVersion, setAuthVersion] = React.useState(0);
   React.useEffect(() => {
-    const syncAuth = () => setIsAuthenticated(!!localStorage.getItem('user') && !!localStorage.getItem('accessToken'));
+    const syncAuth = () => setAuthVersion((value) => value + 1);
     window.addEventListener('pinnacle-auth-change', syncAuth);
     return () => window.removeEventListener('pinnacle-auth-change', syncAuth);
   }, []);
+  const isAuthenticated = React.useMemo(
+    () => !!currentUser && !!localStorage.getItem('accessToken'),
+    [currentUser, authVersion]
+  );
   const [mode, setMode] = React.useState<'light' | 'dark'>(() => {
     const savedMode = window.localStorage.getItem('pinnacle-color-mode');
     return savedMode === 'dark' || savedMode === 'light' ? savedMode : 'light';
@@ -57,7 +72,10 @@ function App() {
     let mounted = true;
     const load = async () => {
       try {
-        const res = isAuthenticated ? await (await import('./services/api.service')).siteSettingsService.get() : await (await import('./services/api.service')).siteSettingsService.getPublic();
+        const service = await import('./services/api.service');
+        const res = canAccessProtectedSiteSettings
+          ? await service.siteSettingsService.get()
+          : await service.siteSettingsService.getPublic();
         if (!mounted) return;
         setSiteSettings(res.data.data);
       } catch (e) {
@@ -68,7 +86,7 @@ function App() {
     const onUpdate = (e: any) => setSiteSettings(e.detail ?? e);
     window.addEventListener('site-settings-updated', onUpdate as EventListener);
     return () => { mounted = false; window.removeEventListener('site-settings-updated', onUpdate as EventListener); };
-  }, [isAuthenticated]);
+  }, [canAccessProtectedSiteSettings, isAuthenticated]);
 
   const themeWithOverrides = React.useMemo(() => getTheme(mode, { primary: siteSettings?.primaryColor, secondary: siteSettings?.secondaryColor }), [mode, siteSettings]);
 
@@ -85,8 +103,9 @@ function App() {
       <BrowserRouter>
         {isAuthenticated ? (
           <DrawerAppBar mode={mode} onToggleColorMode={toggleColorMode}>
-            <Routes>
-              <Route path="/" element={<Home />} />
+            <React.Suspense fallback={<div>Loading page...</div>}>
+              <Routes>
+              <Route path="/" element={<Welcome />} />
               <Route path="/login" element={<Navigate to="/" replace />} />
               <Route path="/register" element={<Navigate to="/" replace />} />
               <Route
@@ -94,6 +113,22 @@ function App() {
                 element={
                   <ProtectedRoute roles={['SUPER_ADMIN', 'SCHOOL_ADMIN']}>
                     <AdminDashboard />
+                  </ProtectedRoute>
+                }
+              />
+              <Route
+                path="/teacher-dashboard"
+                element={
+                  <ProtectedRoute roles={['TEACHER']}>
+                    <TeacherDashboard />
+                  </ProtectedRoute>
+                }
+              />
+              <Route
+                path="/student-dashboard"
+                element={
+                  <ProtectedRoute roles={['STUDENT']}>
+                    <StudentDashboard />
                   </ProtectedRoute>
                 }
               />
@@ -113,7 +148,16 @@ function App() {
                   </ProtectedRoute>
                 }
               />
+              <Route
+                path="/departments"
+                element={
+                  <ProtectedRoute roles={['SUPER_ADMIN', 'SCHOOL_ADMIN']}>
+                    <Departments />
+                  </ProtectedRoute>
+                }
+              />
               <Route path="/courses" element={<Courses />} />
+              <Route path="/course-catalog" element={<CourseCatalog />} />
               <Route path="/timetable" element={<Timetable />} />
               <Route
                 path="/attendance"
@@ -149,15 +193,18 @@ function App() {
                 }
               />
               <Route path="*" element={<Navigate to="/" replace />} />
-            </Routes>
+              </Routes>
+            </React.Suspense>
           </DrawerAppBar>
         ) : (
-          <Routes>
+          <React.Suspense fallback={<div>Loading page...</div>}>
+            <Routes>
             <Route path="/" element={<Home />} />
             <Route path="/login" element={<Login />} />
             <Route path="/register" element={<Register />} />
             <Route path="*" element={<Navigate to="/login" replace />} />
-          </Routes>
+            </Routes>
+          </React.Suspense>
         )}
       </BrowserRouter>
     </ThemeProvider>

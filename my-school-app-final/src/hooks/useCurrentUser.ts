@@ -1,8 +1,11 @@
-export type Role = 'SUPER_ADMIN' | 'SCHOOL_ADMIN' | 'TEACHER' | 'STUDENT';
+export type Role = 'SUPER_ADMIN' | 'SCHOOL_ADMIN' | 'TEACHER' | 'STUDENT' | 'NON_ACADEMIC_STAFF';
 
 export interface CurrentUser {
   id: string;
   email: string;
+  firstName?: string;
+  lastName?: string;
+  phone?: string | null;
   role: Role;
 }
 
