@@ -6,6 +6,7 @@
   "scripts": {
     "dev": "nodemon --watch src --ext ts --exec \"npm run build && node dist/server.js\"",
     "build": "tsc --build",
+    "build:render": "npx prisma generate && npx prisma db push && npm run build",
     "start": "node dist/server.js",
     "db:setup": "prisma db push && npm run seed",
     "seed": "prisma db seed"

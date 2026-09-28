@@ -54,7 +54,7 @@ app.use('/api/attendance', attendanceRouter);
 app.use('/api/grades', gradesRouter);
 app.use('/api/fees', feesRouter);
 // Serve uploaded assets
-app.use('/uploads', express.static(path.join(process.cwd(), 'backend', 'uploads')));
+app.use('/uploads', express.static(path.join(process.cwd(), 'uploads')));
 // Public read endpoint for welcome page to fetch branding without auth
 import SiteSettingsController from './controllers/siteSettingsController.js';
 app.get('/api/site-settings/public', SiteSettingsController.publicGetSettings);
