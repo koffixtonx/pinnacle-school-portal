@@ -7,6 +7,7 @@ import PaymentsIcon from '@mui/icons-material/Payments';
 import { Link as RouterLink } from 'react-router-dom';
 import { siteSettingsService } from '../services/api.service';
 import { useCurrentUser } from '../hooks/useCurrentUser';
+import { resolveAssetUrl } from '../services/api';
 
 // These are only used until an administrator adds welcome backgrounds in
 // Site Customization.  Tenant-provided images always take precedence.
@@ -15,12 +16,6 @@ const fallbackBackgrounds = [
   'https://images.unsplash.com/photo-1509062522246-3755977927d7?auto=format&fit=crop&w=1800&q=85',
   'https://images.unsplash.com/photo-1524995997946-a1c2e315a42f?auto=format&fit=crop&w=1800&q=85',
 ];
-
-const apiOrigin = (import.meta.env.VITE_API_BASE_URL
-  ? String(import.meta.env.VITE_API_BASE_URL).replace(/\/api\/?$/, '')
-  : 'http://localhost:5000');
-
-const resolveAssetUrl = (path: string) => path.startsWith('/uploads') ? `${apiOrigin}${path}` : path;
 
 const getDashboardPath = (role?: string) => {
   if (role === 'SUPER_ADMIN' || role === 'SCHOOL_ADMIN') return '/dashboard';
@@ -50,7 +45,8 @@ const Welcome: React.FC = () => {
         const configuredBackgrounds = Array.isArray(settings?.welcomeBackgroundImages)
           ? settings.welcomeBackgroundImages.filter((image: unknown): image is string => typeof image === 'string' && image.length > 0)
           : [];
-        if (configuredBackgrounds.length) setBackgrounds(configuredBackgrounds.map(resolveAssetUrl));
+        const usableBackgrounds = configuredBackgrounds.map(resolveAssetUrl).filter(Boolean);
+        if (usableBackgrounds.length) setBackgrounds(usableBackgrounds);
         setMessage(typeof settings?.welcomeMessage === 'string' && settings.welcomeMessage.trim() ? settings.welcomeMessage.trim() : null);
         setMessageColor(settings?.welcomeMessageColor || '#f2d675');
       } catch {
@@ -91,13 +87,13 @@ const Welcome: React.FC = () => {
       <Box aria-hidden="true" sx={{ position: 'absolute', inset: 0, pointerEvents: 'none', background: (theme) => theme.palette.mode === 'dark' ? 'linear-gradient(105deg, rgba(4,15,30,.94), rgba(4,15,30,.63))' : 'linear-gradient(105deg, rgba(4,26,53,.89), rgba(4,26,53,.50))' }} />
       <Stack sx={{ position: 'relative', zIndex: 1, minHeight: { xs: 480, md: 620 }, p: { xs: 3, sm: 5, md: 7 }, justifyContent: 'space-between', alignItems: 'flex-start' }}>
         <Box>
-          {loading && <Stack direction="row" spacing={1} alignItems="center" sx={{ mb: 2 }}><CircularProgress size={18} color="inherit" /><Typography variant="body2">Loading welcome settings…</Typography></Stack>}
+          {loading && <Stack direction="row" spacing={1} sx={{ mb: 2, alignItems: 'center' }}><CircularProgress size={18} color="inherit" /><Typography variant="body2">Loading welcome settings…</Typography></Stack>}
           {loadError && <Alert severity="warning" sx={{ mb: 2, maxWidth: 600, bgcolor: 'rgba(255,255,255,.94)' }}>Welcome settings could not be loaded. Default content is being shown; check that the API is available.</Alert>}
           <Typography variant="overline" sx={{ letterSpacing: 2, fontWeight: 700, opacity: .9 }}>PINNACLE UNIVERSITY</Typography>
           <Typography component="h1" variant="h2" sx={{ mt: 1, maxWidth: 760, fontWeight: 900, lineHeight: 1.06, color: message ? messageColor : 'common.white' }}>{displayedMessage}</Typography>
           <Typography variant="h6" sx={{ mt: 2, maxWidth: 610, color: 'rgba(255,255,255,.9)', fontWeight: 400 }}>Your learning community, tools, and progress are all within reach.</Typography>
         </Box>
-        <Stack direction={{ xs: 'column', sm: 'row' }} spacing={1.25} useFlexGap flexWrap="wrap">
+        <Stack direction={{ xs: 'column', sm: 'row' }} spacing={1.25} useFlexGap sx={{ flexWrap: 'wrap' }}>
           {dashboardPath && <Button component={RouterLink} to={dashboardPath} variant="contained" color="secondary" size="large" startIcon={<DashboardIcon />} sx={{ color: 'primary.dark' }}>Open dashboard</Button>}
           <Button component={RouterLink} to="/timetable" variant="outlined" size="large" startIcon={<EventNoteIcon />} sx={quickLinkSx}>Timetable</Button>
           {canAccessFees(currentUser?.role) && <Button component={RouterLink} to="/fees" variant="outlined" size="large" startIcon={<PaymentsIcon />} sx={quickLinkSx}>Fees</Button>}

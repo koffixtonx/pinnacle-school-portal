@@ -93,7 +93,7 @@ interface MetricCardProps {
 const MetricCard: React.FC<MetricCardProps> = ({ title, value, icon: Icon, accent }) => (
   <Card sx={{ height: '100%', border: '1px solid rgba(15, 23, 42, 0.08)', boxShadow: '0 12px 30px rgba(15, 23, 42, 0.06)' }}>
     <CardContent>
-      <Stack direction="row" alignItems="center" spacing={2}>
+      <Stack direction="row" spacing={2} sx={{ alignItems: 'center' }}>
         <Box
           sx={{
             width: 48,
@@ -109,7 +109,7 @@ const MetricCard: React.FC<MetricCardProps> = ({ title, value, icon: Icon, accen
           <Icon />
         </Box>
         <Box>
-          <Typography variant="h5" fontWeight={700}>
+          <Typography variant="h5"  sx={{ fontWeight: 700 }}>
             {value}
           </Typography>
           <Typography variant="body2" color="text.secondary">
@@ -154,6 +154,7 @@ const StudentDashboard: React.FC = () => {
         setGrades(gradesRes.data.data ?? []);
         setInvoices(invoicesRes.data.data ?? []);
       } catch (err) {
+        console.error('Student dashboard load failed', err);
         if (!mounted) return;
         setError('Could not load your dashboard data. Please try again.');
       } finally {
@@ -211,7 +212,7 @@ const StudentDashboard: React.FC = () => {
 
   return (
     <Container maxWidth="lg" sx={{ py: 4 }}>
-      <Typography variant="h4" fontWeight={700} gutterBottom>
+      <Typography variant="h4"  gutterBottom sx={{ fontWeight: 700 }}>
         Welcome, {currentUser?.firstName ?? 'Student'}
       </Typography>
       <Typography variant="body1" color="text.secondary" sx={{ mb: 3 }}>
@@ -251,7 +252,7 @@ const StudentDashboard: React.FC = () => {
       <Box sx={{ display: 'grid', gridTemplateColumns: { xs: '1fr', md: '1.2fr 1fr' }, gap: 3, mb: 3 }}>
         <Card sx={{ border: '1px solid rgba(15, 23, 42, 0.08)' }}>
           <CardContent>
-            <Typography variant="h6" fontWeight={700} gutterBottom>
+            <Typography variant="h6"  gutterBottom sx={{ fontWeight: 700 }}>
               Recent Grades
             </Typography>
             {recentGrades.length === 0 ? (
@@ -291,7 +292,7 @@ const StudentDashboard: React.FC = () => {
 
         <Card sx={{ border: '1px solid rgba(15, 23, 42, 0.08)' }}>
           <CardContent>
-            <Typography variant="h6" fontWeight={700} gutterBottom>
+            <Typography variant="h6"  gutterBottom sx={{ fontWeight: 700 }}>
               Today's Schedule — {DAY_NAMES[today]}
             </Typography>
             {todaysClasses.length === 0 ? (
@@ -305,7 +306,7 @@ const StudentDashboard: React.FC = () => {
                     key={slot.id}
                     sx={{ p: 1.5, borderRadius: 1.5, border: '1px solid rgba(15, 23, 42, 0.08)' }}
                   >
-                    <Typography variant="subtitle2" fontWeight={700}>
+                    <Typography variant="subtitle2"  sx={{ fontWeight: 700 }}>
                       {slot.course.title} ({slot.course.code})
                     </Typography>
                     <Typography variant="body2" color="text.secondary">
@@ -322,12 +323,12 @@ const StudentDashboard: React.FC = () => {
 
       <Card sx={{ border: '1px solid rgba(15, 23, 42, 0.08)', mb: 3 }}>
         <CardContent>
-          <Typography variant="h6" fontWeight={700} gutterBottom>Course selection</Typography>
+          <Typography variant="h6"  gutterBottom sx={{ fontWeight: 700 }}>Course selection</Typography>
           <Typography variant="body2" color="text.secondary" sx={{ mb: 2 }}>Request courses for teacher approval.</Typography>
           <Stack spacing={1}>
             {availableCourses.filter((course) => !course.enrollments[0] || course.enrollments[0].status === 'REJECTED').slice(0, 8).map((course) => (
-              <Stack key={course.id} direction={{ xs: 'column', sm: 'row' }} justifyContent="space-between" alignItems={{ xs: 'flex-start', sm: 'center' }} spacing={1} sx={{ py: 1, borderBottom: '1px solid', borderColor: 'divider' }}>
-                <Box><Typography variant="subtitle2" fontWeight={700}>{course.title} ({course.code})</Typography><Typography variant="caption" color="text.secondary">{course.level ?? '100'} Level</Typography></Box>
+              <Stack key={course.id} direction={{ xs: 'column', sm: 'row' }} spacing={1} sx={{ py: 1, borderBottom: '1px solid', borderColor: 'divider', justifyContent:  'space-between', alignItems: { xs: 'flex-start', sm: 'center' } }}>
+                <Box><Typography variant="subtitle2"  sx={{ fontWeight: 700 }}>{course.title} ({course.code})</Typography><Typography variant="caption" color="text.secondary">{course.level ?? '100'} Level</Typography></Box>
                 <Button size="small" variant="outlined" onClick={() => void requestCourse(course.id)}>Request</Button>
               </Stack>
             ))}
@@ -339,7 +340,7 @@ const StudentDashboard: React.FC = () => {
 
       <Card sx={{ border: '1px solid rgba(15, 23, 42, 0.08)' }}>
         <CardContent>
-          <Typography variant="h6" fontWeight={700} gutterBottom>
+          <Typography variant="h6"  gutterBottom sx={{ fontWeight: 700 }}>
             Fee Invoices
           </Typography>
           {invoices.length === 0 ? (

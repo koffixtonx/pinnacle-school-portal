@@ -65,8 +65,8 @@ const Register: React.FC = () => {
 
       const { user, accessToken } = response.data;
 
-      // The refresh token is set as an httpOnly cookie by the server and is
-      // never exposed to JS - only the short-lived access token is stored here.
+      // supabase-js keeps and refreshes the session itself; this copy is only
+      // what App.tsx reads to decide whether to render the signed-in shell.
       localStorage.setItem('accessToken', accessToken);
       localStorage.setItem('user', JSON.stringify(user));
       window.dispatchEvent(new Event('pinnacle-auth-change'));

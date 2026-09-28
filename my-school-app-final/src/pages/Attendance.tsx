@@ -143,7 +143,7 @@ const Attendance: React.FC = () => {
         <Typography variant="h4" sx={{ fontWeight: 700, mb: 1 }}>
           Attendance
         </Typography>
-        <Typography variant="body2" color="textSecondary">
+        <Typography variant="body2" color="text.secondary">
           {canMark ? 'Mark daily attendance for your class.' : 'Your attendance history.'}
         </Typography>
       </Box>

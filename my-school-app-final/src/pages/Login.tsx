@@ -13,63 +13,35 @@ import {
 } from '@mui/material';
 import { authService } from '../services/api.service';
 
-// Seeded demo accounts from backend/prisma/seed.ts. These are real accounts with
-// real passwords in the database; "quick login" still goes through the normal
-// /auth/login endpoint, it just fills the form for you. Only shown in local
-// development builds (import.meta.env.DEV) so it never ships to production -
-// a real deployment holding student records must never offer a no-password
-// way to sign in as a privileged role.
-const DEMO_ACCOUNTS: { label: string; role: string; email: string; password: string }[] = [
-  { label: 'Super Admin', role: 'SUPER_ADMIN', email: 'admin@pinnacle.school', password: 'AdminPass!234' },
-  { label: 'Teacher', role: 'TEACHER', email: 'teacher@pinnacle.school', password: 'TeacherPass!234' },
-  { label: 'Student', role: 'STUDENT', email: 'student@pinnacle.school', password: 'StudentPass!234' },
-  { label: 'Staff', role: 'NON_ACADEMIC_STAFF', email: 'staff1@pinnacle.test', password: 'StaffPass!234' },
-];
-
 const Login: React.FC = () => {
   const navigate = useNavigate();
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState('');
   const [email, setEmail] = useState('');
   const [password, setPassword] = useState('');
-  const [quickLoginRole, setQuickLoginRole] = useState<string | null>(null);
 
-  const getPostLoginPath = (role?: string) => {
-    // Direct users to the welcome page after login so the dashboard is not used as a landing screen.
-    if (role === 'NON_ACADEMIC_STAFF') return '/';
-    return '/';
-  };
-
-  const performLogin = async (loginEmail: string, loginPassword: string) => {
+  const handleLogin = async (e: React.FormEvent) => {
+    e.preventDefault();
     setError('');
     setLoading(true);
     try {
-      const response = await authService.login(loginEmail, loginPassword);
+      const response = await authService.login(email, password);
       const { user, accessToken } = response.data;
 
-      // The refresh token is set as an httpOnly cookie by the server and is
-      // never exposed to JS - only the short-lived access token is stored here.
+      // supabase-js keeps and refreshes the session itself; this copy is only
+      // what App.tsx reads to decide whether to render the signed-in shell.
       localStorage.setItem('accessToken', accessToken);
       localStorage.setItem('user', JSON.stringify(user));
       window.dispatchEvent(new Event('pinnacle-auth-change'));
 
-      navigate(getPostLoginPath(user.role));
+      // Land on the welcome page; the role-specific dashboards stay reachable
+      // from its quick links rather than being used as a post-login redirect.
+      navigate('/');
     } catch (err: any) {
       setError(err.response?.data?.message || 'Login failed. Please try again.');
     } finally {
       setLoading(false);
-      setQuickLoginRole(null);
     }
-  };
-
-  const handleLogin = async (e: React.FormEvent) => {
-    e.preventDefault();
-    await performLogin(email, password);
-  };
-
-  const handleQuickLogin = async (account: (typeof DEMO_ACCOUNTS)[number]) => {
-    setQuickLoginRole(account.role);
-    await performLogin(account.email, account.password);
   };
 
   return (
@@ -129,30 +101,6 @@ const Login: React.FC = () => {
                 </Link>
               </Typography>
             </Box>
-
-            {import.meta.env.DEV && (
-              <Box sx={{ mt: 3 }}>
-                <Typography variant="caption" color="text.secondary" sx={{ display: 'block', textAlign: 'center', mb: 1 }}>
-                  Development only - sign in as a seeded demo account
-                </Typography>
-                <Box sx={{ display: 'flex', gap: 1, flexWrap: 'wrap', justifyContent: 'center' }}>
-                  {DEMO_ACCOUNTS.map((account) => (
-                    <Button
-                      key={account.role}
-                      size="small"
-                      variant="outlined"
-                      disabled={loading}
-                      onClick={() => handleQuickLogin(account)}
-                    >
-                      {loading && quickLoginRole === account.role ? (
-                        <CircularProgress size={16} sx={{ mr: 1 }} />
-                      ) : null}
-                      {account.label}
-                    </Button>
-                  ))}
-                </Box>
-              </Box>
-            )}
           </CardContent>
         </Card>
       </Box>

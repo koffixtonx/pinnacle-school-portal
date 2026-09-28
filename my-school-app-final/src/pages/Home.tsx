@@ -11,7 +11,7 @@ import {
   Stack,
   Typography,
 } from '@mui/material';
-import { Link as RouterLink, useNavigate } from 'react-router-dom';
+import { Link as RouterLink } from 'react-router-dom';
 import KeyboardArrowLeftIcon from '@mui/icons-material/KeyboardArrowLeft';
 import KeyboardArrowRightIcon from '@mui/icons-material/KeyboardArrowRight';
 import SchoolIcon from '@mui/icons-material/School';
@@ -20,8 +20,7 @@ import MenuBookIcon from '@mui/icons-material/MenuBook';
 import EventNoteIcon from '@mui/icons-material/EventNote';
 import pinnacleLogo from '../assets/pinnacle-logo.png';
 import { siteSettingsService } from '../services/api.service';
-import { useCurrentUser } from '../hooks/useCurrentUser';
-import { authService } from '../services/api.service';
+import { resolveAssetUrl } from '../services/api';
 
 const slides = [
   {
@@ -50,15 +49,6 @@ const highlights = [
 
 const Home: React.FC = () => {
   const [activeSlide, setActiveSlide] = React.useState(0);
-  const navigate = useNavigate();
-  const currentUser = useCurrentUser();
-  const isAuthenticated = Boolean(currentUser && localStorage.getItem('accessToken'));
-
-  React.useEffect(() => {
-    if (isAuthenticated && currentUser) {
-      navigate('/', { replace: true });
-    }
-  }, [currentUser, isAuthenticated, navigate]);
 
   React.useEffect(() => {
     const timer = window.setInterval(() => {
@@ -76,38 +66,19 @@ const Home: React.FC = () => {
     setActiveSlide((current) => (current - 1 + slides.length) % slides.length);
   };
 
-  const handleLogout = async () => {
-    try {
-      await authService.logout();
-    } catch (err) {
-      console.error('Logout failed', err);
-    } finally {
-      localStorage.removeItem('accessToken');
-      localStorage.removeItem('user');
-      window.dispatchEvent(new Event('pinnacle-auth-change'));
-      navigate('/login');
-    }
-  };
-
   const currentSlide = slides[activeSlide];
   const [logoSrc, setLogoSrc] = React.useState<string | null>(pinnacleLogo);
   const [welcomeMessage, setWelcomeMessage] = React.useState<string | null>(null);
   const [welcomeMessageColor, setWelcomeMessageColor] = React.useState('#f2d675');
   const [welcomeBackgrounds, setWelcomeBackgrounds] = React.useState<string[]>([]);
   const [activeBackground, setActiveBackground] = React.useState(0);
-  const apiBaseUrl = import.meta.env.VITE_API_BASE_URL ? String(import.meta.env.VITE_API_BASE_URL).replace(/\/api$/, '') : 'http://localhost:5000';
-
-  const resolveAssetUrl = (path: string) => {
-    if (!path) return path;
-    return path.startsWith('/uploads') ? `${apiBaseUrl}${path}` : path;
-  };
 
   React.useEffect(() => {
     let mounted = true;
     siteSettingsService.getPublic().then((res) => {
       if (!mounted) return;
       const data = res.data.data;
-      if (data?.logoPath) setLogoSrc(data.logoPath);
+      if (data?.logoPath) setLogoSrc(resolveAssetUrl(data.logoPath));
       if (typeof data?.welcomeMessage === 'string' && data.welcomeMessage.trim()) {
         setWelcomeMessage(data.welcomeMessage.trim());
       } else {
@@ -119,7 +90,10 @@ const Home: React.FC = () => {
     return () => { mounted = false; };
   }, []);
 
-  const resolvedBackgrounds = welcomeBackgrounds.map(resolveAssetUrl);
+  const resolvedBackgrounds = React.useMemo(
+    () => welcomeBackgrounds.map(resolveAssetUrl).filter(Boolean),
+    [welcomeBackgrounds],
+  );
 
   React.useEffect(() => {
     if (resolvedBackgrounds.length < 2) return undefined;
@@ -164,7 +138,7 @@ const Home: React.FC = () => {
           >
             <Box
               component="img"
-              src={resolveAssetUrl(logoSrc ?? pinnacleLogo)}
+              src={logoSrc || pinnacleLogo}
               alt="Pinnacle University"
               sx={{
                 width: { xs: 86, sm: 104 },
@@ -200,24 +174,18 @@ const Home: React.FC = () => {
               {currentSlide.caption}
             </Typography>
             <Stack direction={{ xs: 'column', sm: 'row' }} spacing={1.5}>
-              <Button component={RouterLink} to={isAuthenticated ? getRoleDashboardPath(currentUser?.role) : '/login'} variant="contained" color="secondary" size="large" sx={{ color: '#08223c' }}>
-                {isAuthenticated ? 'Open Dashboard' : 'Get Started'}
+              <Button component={RouterLink} to="/login" variant="contained" color="secondary" size="large" sx={{ color: '#08223c' }}>
+                Get Started
               </Button>
-              {isAuthenticated ? (
-                <Button variant="outlined" size="large" onClick={handleLogout} sx={{ color: 'common.white', borderColor: 'rgba(255,255,255,0.72)' }}>
-                  Sign Out
-                </Button>
-              ) : (
-                <Button
-                  component={RouterLink}
-                  to="/login"
-                  variant="outlined"
-                  size="large"
-                  sx={{ color: 'common.white', borderColor: 'rgba(255,255,255,0.72)' }}
-                >
-                  Sign In
-                </Button>
-              )}
+              <Button
+                component={RouterLink}
+                to="/login"
+                variant="outlined"
+                size="large"
+                sx={{ color: 'common.white', borderColor: 'rgba(255,255,255,0.72)' }}
+              >
+                Sign In
+              </Button>
             </Stack>
           </Box>
 
@@ -250,7 +218,7 @@ const Home: React.FC = () => {
 
       <Grid container spacing={3} sx={{ mt: 3 }}>
         {highlights.map((item) => (
-          <Grid key={item.label} xs={12} sm={6} md={3}>
+          <Grid key={item.label}    size={{ xs: 12, sm: 6, md: 3 }}>
             <Card sx={{ height: '100%', borderTop: '3px solid', borderColor: 'secondary.main' }}>
               <CardContent sx={{ display: 'flex', alignItems: 'center', gap: 2 }}>
                 <Box
@@ -279,7 +247,7 @@ const Home: React.FC = () => {
       </Grid>
 
       <Grid container spacing={3} sx={{ mt: 1 }}>
-        <Grid xs={12} md={7}>
+        <Grid size={{ xs: 12, md: 7 }}>
           <Card sx={{ height: '100%' }}>
             <CardContent sx={{ p: { xs: 3, md: 4 } }}>
               <Typography variant="h5" sx={{ fontWeight: 800, mb: 2 }}>
@@ -294,7 +262,7 @@ const Home: React.FC = () => {
           </Card>
         </Grid>
 
-        <Grid xs={12} md={5}>
+        <Grid size={{ xs: 12, md: 5 }}>
           <Card sx={{ height: '100%' }}>
             <CardContent sx={{ p: { xs: 3, md: 4 } }}>
               <Typography variant="h5" sx={{ fontWeight: 800, mb: 2 }}>

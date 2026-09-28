@@ -1,0 +1,8 @@
+node_modules
+.env
+.DS_Store
+
+# Retired server: build output and the local MySQL data directory used during
+# development. Neither belongs in version control.
+dist/
+mysql-user/

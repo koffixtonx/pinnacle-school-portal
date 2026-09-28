@@ -1,200 +1,112 @@
-# Quick Start Guide - Pinnacle University School Portal
+# Quick Start — Pinnacle University School Portal
 
-## ⚡ Quick Setup (5 Minutes)
+The app is a React SPA with no server of its own: Supabase provides Postgres (with Row Level
+Security), Auth and Storage.
 
-### Step 1: Install Backend Dependencies
+## ⚡ Setup
+
+### 1. Apply the schema
+
+Supabase dashboard → SQL Editor → run `supabase/migrations/0001_schema.sql` through
+`0005_seed.sql` **in order**, or:
+
 ```bash
-cd backend
+supabase link --project-ref YOUR_PROJECT_REF
+supabase db push
+```
+
+### 2. Configure the client
+
+```bash
 npm install
+cp .env.example .env.local
 ```
 
-### Step 2: Install Frontend Dependencies
-```bash
-cd ..
-npm install
-```
-
-### Step 3: Start MongoDB
-**Local Setup:**
-```bash
-# Make sure MongoDB is running
-mongod
-```
-
-**Or use MongoDB Atlas (Cloud):**
-- Create account at mongodb.com/cloud/atlas
-- Get connection string
-- Update `MONGODB_URI` in `backend/.env`
-
-### Step 4: Start Backend
-```bash
-cd backend
-npm run dev
-# Server runs on http://localhost:5000
-```
-
-### Step 5: Start Frontend (New Terminal)
-```bash
-cd my-school-app
-npm run dev
-# App opens at http://localhost:5173
-```
-
-## 📝 First Time User Flow
-
-1. **Register as Admin** - First registration creates Admin account
-   - Go to http://localhost:5173/register
-   - Fill in your details
-   - You're now Admin!
-
-2. **Admin Dashboard** - Access at `/dashboard`
-   - Manage your profile
-   - Edit homepage slides and content
-   - View all users and change their roles
-
-3. **Invite Users**
-   - Share registration link
-   - They register as Students by default
-   - You can change their role in admin dashboard
-
-## 🔑 Environmental Variables
-
-**Backend (.env)**
 ```env
-PORT=5000
-MONGODB_URI=mongodb://localhost:27017/pinnacle-school
-JWT_SECRET=change-this-to-random-string
-JWT_REFRESH_SECRET=change-this-to-another-random-string
-CLIENT_URL=http://localhost:5173
-NODE_ENV=development
+VITE_SUPABASE_URL=https://YOUR-PROJECT-REF.supabase.co
+VITE_SUPABASE_ANON_KEY=your-anon-public-key
 ```
 
-**Frontend (.env)**
-```env
-VITE_API_BASE_URL=http://localhost:5000/api
-```
+Both come from **Project Settings → API**. They are safe to expose: RLS decides what the anon key
+can reach. Never put the `service_role` key in this project.
 
-## 🎯 API Testing Quick Reference
+### 3. Run it
 
-### Register
 ```bash
-curl -X POST http://localhost:5000/api/auth/register \
-  -H "Content-Type: application/json" \
-  -d '{
-    "firstName": "John",
-    "lastName": "Doe",
-    "email": "john@example.com",
-    "password": "password123"
-  }'
+npm run dev      # http://localhost:5173
 ```
 
-### Login
+### 4. Create an administrator
+
+Register at `/register` — self-registration always produces a `STUDENT` — then promote your row in
+the SQL editor:
+
+```sql
+update public.profiles set role = 'SUPER_ADMIN' where email = 'you@example.com';
+```
+
+Sign out and back in so the new role reaches the client. Everyone else is created from the admin
+UI (Students, Teachers pages), which provisions accounts through `create_school_user()`.
+
+## 🧭 First session
+
+1. **Dashboard** (`/dashboard`) — enrollment, collections and attendance charts, recent audit
+   activity, CSV student import.
+2. **Site Customization** (`/site-customization`) — logo, hero image, theme colours, welcome
+   message and up to eight rotating welcome backgrounds. Uploads go to Supabase Storage.
+3. **Departments → Courses → Timetable** — build the academic structure before recording
+   attendance or grades.
+4. **Students / Teachers** — create accounts. New accounts sign in with the initial password that
+   `create_school_user()` assigns (`ChangeMe123!`); each person replaces it under
+   **Settings → Change Password**.
+5. **Attendance / Grades / Fees** — operational modules, each with role-scoped reads.
+
+## 🛠️ Commands
+
 ```bash
-curl -X POST http://localhost:5000/api/auth/login \
-  -H "Content-Type: application/json" \
-  -d '{
-    "email": "john@example.com",
-    "password": "password123"
-  }'
+npm run dev        # Vite dev server
+npm run build      # tsc -b then vite build
+npm run preview    # serve dist/
+npm run lint       # ESLint
+sh supabase/tests/local/apply.sh   # RLS / trigger assertions on a local Postgres
 ```
 
-### Get Homepage Content
-```bash
-curl http://localhost:5000/api/home
-```
+There is no `db:setup` any more — schema changes are new files in `supabase/migrations/`, and the
+assertions in `supabase/tests/local/` run them against a throwaway database. Add a check there
+whenever you add a policy.
 
-### Get Admin Profile (Requires token)
-```bash
-curl http://localhost:5000/api/home/admin/profile \
-  -H "Authorization: Bearer YOUR_ACCESS_TOKEN"
-```
+## 🔐 Security checklist
 
-## 🛠️ Common Commands
-
-**Backend Development:**
-```bash
-cd backend
-npm run dev      # Start with hot reload
-npm start        # Start production
-```
-
-**Frontend Development:**
-```bash
-npm run dev      # Start Vite dev server
-npm run build    # Build for production
-npm run preview  # Preview production build
-npm run lint     # Run ESLint
-```
-
-## 📚 Project Features
-
-### ✅ Completed
-- [x] User registration & JWT authentication
-- [x] Role-based access control (RBAC)
-- [x] Admin dashboard
-- [x] Homepage content management
-- [x] User management
-- [x] Protected routes
-- [x] Dark/Light mode
-
-### 🚀 Ready to Add
-- [ ] Email verification
-- [ ] Password reset
-- [ ] File uploads for profile photos
-- [ ] Real-time notifications
-- [ ] Student grades/marks system
-- [ ] Course enrollment
-- [ ] Attendance tracking
-
-## 🔐 Security Checklist
-
-- [x] Passwords hashed with bcryptjs
-- [x] JWT tokens with expiration
-- [x] Protected admin routes
-- [x] CORS configured
-- [x] Environment variables for secrets
-- [ ] Input validation (can add express-validator)
-- [ ] Rate limiting (can add express-rate-limit)
-- [ ] HTTPS in production
+- [x] RLS enabled on every table, denial by default
+- [x] `tenant_id` derived from the JWT and defaulted by the database
+- [x] Client-supplied roles rejected by `handle_new_auth_user()`
+- [x] Guard triggers on profiles, enrollments, attendance, grades and site settings
+- [x] Audit trail written by triggers, not by application code
+- [x] Storage buckets writable by administrators only
+- [ ] Enable email confirmation / MFA in Supabase Auth before real users sign up
+- [ ] HTTPS everywhere (Supabase enforces TLS on its endpoints)
 
 ## 🐛 Troubleshooting
 
-### Port Already in Use
-```bash
-# Kill process on port 5000
-lsof -ti:5000 | xargs kill -9
+**Blank page, `VITE_SUPABASE_URL and VITE_SUPABASE_ANON_KEY must be set`**
+`.env.local` is missing or was created after `npm run dev` started. Restart Vite.
 
-# Or change port in backend/.env and frontend/.env
-```
+**`permission` / `row-level-security` errors in the console**
+A migration was skipped. `0003_rls.sql` must run after `0002_functions.sql`.
 
-### MongoDB Connection Failed
-```bash
-# Check MongoDB is running
-mongosh
+**Sign-in succeeds, data is empty**
+No tenant row: apply `0005_seed.sql`, register again so the trigger can attach your profile.
 
-# Or verify connection string in .env
-mongodb://localhost:27017/pinnacle-school
-```
+**Images upload but do not display**
+Run `0004_storage.sql` to create the buckets. Paths beginning with `/uploads/` are legacy
+Express-era values and no longer resolve.
 
-### CORS Errors
-- Verify `CLIENT_URL` matches frontend URL
-- Check backend .env has correct `CLIENT_URL`
+**`Invalid login credentials` for a user created in the dashboard**
+Accounts created by `create_school_user()` get a generated password; use the one shown in the UI,
+or reset it from Supabase → Authentication → Users.
 
-### Can't Login
-- Clear localStorage: `localStorage.clear()` in browser console
-- Verify backend is running
-- Check `.env` values match
+## 📚 More
 
-## 📞 Support
-
-- Check README.md for detailed documentation
-- Review API endpoints in backend routes
-- Check browser console for errors
-- Check backend terminal for server errors
-
-## 🎉 You're All Set!
-
-Your full-stack MERN school portal is ready to use. Start building amazing features!
-
----
-**Happy Coding! 🚀**
+- `README.md` — architecture, data layer conventions, role matrix, deployment
+- `HOSTING.md` — static hosting and Supabase settings
+- `../legacy-express-backend/` — the retired Node/Express/Prisma server, for reference only

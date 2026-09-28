@@ -1,0 +1,22 @@
+services:
+  - type: web
+    name: my-school-app-backend
+    runtime: node
+    rootDir: backend
+    buildCommand: npm ci && npm run build:render
+    startCommand: npm start
+    envVars:
+      - key: DATABASE_URL
+        sync: false
+      - key: JWT_SECRET
+        generateValue: true
+      - key: JWT_REFRESH_SECRET
+        generateValue: true
+      - key: CLIENT_URL
+        sync: false
+      - key: DEFAULT_TENANT_SLUG
+        value: pinnacle-school
+      - key: NODE_ENV
+        value: production
+      - key: SECURE_COOKIES
+        value: "true"

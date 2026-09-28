@@ -147,7 +147,7 @@ const Grades: React.FC = () => {
         <Typography variant="h4" sx={{ fontWeight: 700, mb: 1 }}>
           Grades
         </Typography>
-        <Typography variant="body2" color="textSecondary">
+        <Typography variant="body2" color="text.secondary">
           {canEnter ? 'Enter and review grades for your courses.' : 'Your grades.'}
         </Typography>
       </Box>
@@ -289,7 +289,7 @@ const Grades: React.FC = () => {
             type="date"
             fullWidth
             margin="normal"
-            InputLabelProps={{ shrink: true }}
+             slotProps={{ inputLabel: { shrink: true } }}
             value={periodForm.startsAt}
             onChange={(e) => setPeriodForm({ ...periodForm, startsAt: e.target.value })}
           />
@@ -298,7 +298,7 @@ const Grades: React.FC = () => {
             type="date"
             fullWidth
             margin="normal"
-            InputLabelProps={{ shrink: true }}
+             slotProps={{ inputLabel: { shrink: true } }}
             value={periodForm.endsAt}
             onChange={(e) => setPeriodForm({ ...periodForm, endsAt: e.target.value })}
           />

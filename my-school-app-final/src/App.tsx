@@ -43,27 +43,17 @@ const ProtectedRoute: React.FC<{ children: React.ReactNode; roles?: Role[] }> = 
 function App() {
   const currentUser = useCurrentUser();
   const canAccessProtectedSiteSettings = !!currentUser && ['SUPER_ADMIN', 'SCHOOL_ADMIN'].includes(currentUser.role);
-  const getRoleDashboardPath = (role?: Role) => {
-    // Keep the welcome page as the landing destination after login, while preserving direct dashboard routes.
-    return '/';
-  };
-
-  const [authVersion, setAuthVersion] = React.useState(0);
+  const [, bumpAuthVersion] = React.useState(0);
   React.useEffect(() => {
-    const syncAuth = () => setAuthVersion((value) => value + 1);
+    const syncAuth = () => bumpAuthVersion((value) => value + 1);
     window.addEventListener('pinnacle-auth-change', syncAuth);
     return () => window.removeEventListener('pinnacle-auth-change', syncAuth);
   }, []);
-  const isAuthenticated = React.useMemo(
-    () => !!currentUser && !!localStorage.getItem('accessToken'),
-    [currentUser, authVersion]
-  );
+  const isAuthenticated = !!currentUser && !!localStorage.getItem('accessToken');
   const [mode, setMode] = React.useState<'light' | 'dark'>(() => {
     const savedMode = window.localStorage.getItem('pinnacle-color-mode');
     return savedMode === 'dark' || savedMode === 'light' ? savedMode : 'light';
   });
-
-  const theme = React.useMemo(() => getTheme(mode), [mode]);
 
   const [siteSettings, setSiteSettings] = React.useState<any>(null);
 
@@ -78,8 +68,8 @@ function App() {
           : await service.siteSettingsService.getPublic();
         if (!mounted) return;
         setSiteSettings(res.data.data);
-      } catch (e) {
-        // ignore
+      } catch {
+        // Branding is cosmetic; fall back to the default theme when it can't be read.
       }
     };
     load();

@@ -167,7 +167,7 @@ const Fees: React.FC = () => {
           <Typography variant="h4" sx={{ fontWeight: 700, mb: 1 }}>
             Fees &amp; Invoicing
           </Typography>
-          <Typography variant="body2" color="textSecondary">
+          <Typography variant="body2" color="text.secondary">
             {isAdmin ? 'Manage invoices and record payments.' : 'Your invoices and payment history.'}
           </Typography>
         </Box>
@@ -263,7 +263,7 @@ const Fees: React.FC = () => {
             type="date"
             fullWidth
             margin="normal"
-            InputLabelProps={{ shrink: true }}
+             slotProps={{ inputLabel: { shrink: true } }}
             value={invoiceForm.dueDate}
             onChange={(e) => setInvoiceForm({ ...invoiceForm, dueDate: e.target.value })}
           />

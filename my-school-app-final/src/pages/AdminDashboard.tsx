@@ -28,9 +28,6 @@ import {
 } from '@mui/material';
 import {
   AdminPanelSettings,
-  ArrowDownward,
-  ArrowUpward,
-  Download,
   PeopleAlt,
   ReceiptLong,
   Refresh,
@@ -69,7 +66,7 @@ interface AuditLogEntry {
 
 interface EnrollmentAnalytics {
   enrollmentTrend: Array<{ createdAt: string; _count: { id: number } }>;
-  totals: { totalStudents: number; totalTeachers: number };
+  totals: { totalStudents: number; totalTeachers: number; averageScore: number | null; averageLetter: string | null };
 }
 
 interface FeeAnalytics {
@@ -97,7 +94,7 @@ const formatDate = (value: string) =>
 const MetricCard: React.FC<MetricCardProps> = ({ title, value, caption, icon: Icon, accent }) => (
   <Card sx={{ height: '100%', border: '1px solid rgba(15, 23, 42, 0.08)', boxShadow: '0 12px 30px rgba(15, 23, 42, 0.06)' }}>
     <CardContent>
-      <Stack direction="row" spacing={2} alignItems="center">
+      <Stack direction="row" spacing={2} sx={{ alignItems: 'center' }}>
         <Avatar sx={{ bgcolor: accent, width: 48, height: 48 }}>
           <Icon />
         </Avatar>
@@ -355,7 +352,7 @@ const AdminDashboard: React.FC = () => {
         }}
       >
         <CardContent>
-          <Stack direction={{ xs: 'column', md: 'row' }} spacing={2} justifyContent="space-between" alignItems={{ xs: 'flex-start', md: 'center' }}>
+          <Stack direction={{ xs: 'column', md: 'row' }} spacing={2} sx={{ justifyContent: 'space-between', alignItems: { xs: 'flex-start', md: 'center' } }}>
             <Box>
               <Typography variant="overline" sx={{ letterSpacing: 1.8, opacity: 0.8 }}>
                 School administration
@@ -367,7 +364,7 @@ const AdminDashboard: React.FC = () => {
                 Monitor student growth, attendance, fee collections, and system activity from one polished workspace.
               </Typography>
             </Box>
-            <Stack direction={{ xs: 'column', sm: 'row' }} spacing={1.5} alignItems="center">
+            <Stack direction={{ xs: 'column', sm: 'row' }} spacing={1.5} sx={{ alignItems: 'center' }}>
               <IconButton onClick={() => setDrawerOpen(true)} sx={{ color: 'white' }} aria-label="open-options">
                 <MenuIcon />
               </IconButton>
@@ -395,7 +392,7 @@ const AdminDashboard: React.FC = () => {
 
       <Drawer anchor="right" open={drawerOpen} onClose={() => setDrawerOpen(false)}>
         <Box sx={{ width: 320, p: 2 }} role="presentation">
-          <Stack direction="row" justifyContent="space-between" alignItems="center" sx={{ mb: 2 }}>
+          <Stack direction="row" sx={{ mb: 2, justifyContent:  'space-between', alignItems: 'center' }}>
             <Typography variant="h6">Admin Options</Typography>
             <IconButton onClick={() => setDrawerOpen(false)}><MenuIcon /></IconButton>
           </Stack>
@@ -423,7 +420,7 @@ const AdminDashboard: React.FC = () => {
 
       <Card sx={{ mb: 3, borderRadius: 3, border: '1px solid rgba(15, 23, 42, 0.08)' }}>
         <CardContent>
-          <Stack direction={{ xs: 'column', md: 'row' }} spacing={2} justifyContent="space-between" alignItems={{ xs: 'stretch', md: 'center' }}>
+          <Stack direction={{ xs: 'column', md: 'row' }} spacing={2} sx={{ justifyContent: 'space-between', alignItems: { xs: 'stretch', md: 'center' } }}>
             <Box>
               <Typography variant="h6" sx={{ fontWeight: 700 }}>
                 Dashboard navigation
@@ -462,12 +459,11 @@ const AdminDashboard: React.FC = () => {
           <Box sx={{ display: 'grid', gap: 2, gridTemplateColumns: { xs: '1fr', lg: '1.4fr 1fr' } }}>
             <Card sx={{ borderRadius: 3, border: '1px solid rgba(15, 23, 42, 0.06)' }}>
               <CardContent>
-                <Stack direction="row" justifyContent="space-between" alignItems="center" sx={{ mb: 2 }}>
+                <Stack direction="row" sx={{ mb: 2, justifyContent:  'space-between', alignItems: 'center' }}>
                   <Box>
                     <Typography variant="h6" sx={{ fontWeight: 700 }}>Welcome back</Typography>
                     <Typography variant="body2" color="text.secondary">Overview of recent activity and quick actions</Typography>
                   </Box>
-                  <Button variant="contained" startIcon={<Download />} onClick={() => navigate('/reports')}>View report</Button>
                 </Stack>
 
                 <Box sx={{ height: 120 }}>
@@ -486,7 +482,7 @@ const AdminDashboard: React.FC = () => {
               <Card sx={{ borderRadius: 3 }}>
                 <CardContent>
                   <Typography variant="subtitle2" sx={{ fontWeight: 700 }}>Attendance Rate</Typography>
-                  <Stack direction="row" alignItems="center" spacing={2} sx={{ mt: 1 }}>
+                  <Stack direction="row" spacing={2} sx={{ mt: 1, alignItems:  'center' }}>
                     <Typography variant="h4" sx={{ fontWeight: 700 }}>{overviewStats.attendanceRate}%</Typography>
                     <Box sx={{ flex: 1, height: 60 }}>
                       <ResponsiveContainer width="100%" height="100%">
@@ -502,32 +498,32 @@ const AdminDashboard: React.FC = () => {
               <Card sx={{ borderRadius: 3 }}>
                 <CardContent>
                   <Typography variant="subtitle2" sx={{ fontWeight: 700 }}>Average Grade</Typography>
-                  <Typography variant="h5" sx={{ fontWeight: 700, mb: 1 }}>B+</Typography>
-                  <Box sx={{ height: 60 }}>
-                    <ResponsiveContainer width="100%" height="100%">
-                      <LineChart data={(enrollment?.enrollmentTrend.map((r, i) => ({ name: i, value: Math.max(60, Math.min(90, Math.round(70 + (i % 5) * 3)) ) })) ?? [])}>
-                        <Line dataKey="value" stroke="#2e7d32" dot={false} strokeWidth={2} />
-                      </LineChart>
-                    </ResponsiveContainer>
-                  </Box>
+                  <Typography variant="h5" sx={{ fontWeight: 700 }}>
+                    {enrollment?.totals.averageLetter ?? '—'}
+                    {enrollment?.totals.averageScore != null && (
+                      <Typography component="span" variant="body2" color="text.secondary" sx={{ ml: 1 }}>
+                        {enrollment.totals.averageScore}/100
+                      </Typography>
+                    )}
+                  </Typography>
+                  <Typography variant="body2" color="text.secondary">Mean of all recorded assessment scores</Typography>
                 </CardContent>
               </Card>
 
               <Card sx={{ borderRadius: 3 }}>
                 <CardContent>
-                  <Stack direction="row" justifyContent="space-between" alignItems="center">
-                    <Typography variant="subtitle2" sx={{ fontWeight: 700 }}>Budget</Typography>
+                  <Stack direction="row" sx={{ justifyContent: 'space-between', alignItems: 'center' }}>
+                    <Typography variant="subtitle2" sx={{ fontWeight: 700 }}>Monthly collections</Typography>
                     <MonetizationOn color="action" />
                   </Stack>
                   <Typography variant="h6" sx={{ fontWeight: 700, mt: 1 }}>{formatCurrency(overviewStats.totalCollected)}</Typography>
                   <Box sx={{ height: 50, mt: 1 }}>
                     <ResponsiveContainer width="100%" height="100%">
-                      <AreaChart data={(enrollment?.enrollmentTrend.map((r, i) => ({ name: i, value: Number(fees?.monthlyCollection[i]?._sum.amount ?? 0) })) ?? [])}>
+                      <AreaChart data={(fees?.monthlyCollection.map((r) => ({ name: new Date(r.paidAt).toLocaleDateString(undefined, { month: 'short' }), value: Number(r._sum.amount ?? 0) })) ?? [])}>
                         <Area dataKey="value" stroke="#7b1fa2" fillOpacity={0.15} fill="#7b1fa2" />
                       </AreaChart>
                     </ResponsiveContainer>
                   </Box>
-                  <Button fullWidth variant="contained" sx={{ mt: 2 }}>Increase budget</Button>
                 </CardContent>
               </Card>
             </Box>
@@ -536,7 +532,7 @@ const AdminDashboard: React.FC = () => {
           <Box sx={{ display: 'grid', gap: 3, gridTemplateColumns: { xs: '1fr', lg: '1.2fr 0.8fr' } }}>
             <Card sx={{ borderRadius: 3, border: '1px solid rgba(15, 23, 42, 0.08)' }}>
               <CardContent>
-                <Stack direction="row" spacing={1.5} alignItems="center" sx={{ mb: 2 }}>
+                <Stack direction="row" spacing={1.5} sx={{ mb: 2, alignItems:  'center' }}>
                   <Avatar sx={{ bgcolor: '#e3f2fd', color: '#1565c0' }}>
                     <AdminPanelSettings />
                   </Avatar>
@@ -583,7 +579,7 @@ const AdminDashboard: React.FC = () => {
 
             <Card sx={{ borderRadius: 3, border: '1px solid rgba(15, 23, 42, 0.08)' }}>
               <CardContent>
-                <Stack direction="row" spacing={1.5} alignItems="center" sx={{ mb: 2 }}>
+                <Stack direction="row" spacing={1.5} sx={{ mb: 2, alignItems:  'center' }}>
                   <Avatar sx={{ bgcolor: '#e8f5e9', color: '#2e7d32' }}>
                     <Security />
                   </Avatar>
@@ -604,7 +600,7 @@ const AdminDashboard: React.FC = () => {
                     <Typography variant="body2" color="text.secondary" sx={{ mb: 2 }}>
                       Based on {overviewStats.totalAttendanceRecords} attendance records.
                     </Typography>
-                    <Stack direction="row" spacing={1} flexWrap="wrap">
+                    <Stack direction="row" spacing={1} sx={{ flexWrap: 'wrap' }}>
                       {attendance.attendanceTotals.map((row) => (
                         <Chip key={row.status} label={`${row.status}: ${row._count.status}`} color={row.status.toLowerCase().includes('present') ? 'success' : 'default'} />
                       ))}
@@ -659,7 +655,7 @@ const AdminDashboard: React.FC = () => {
 
           <Card sx={{ borderRadius: 3, border: '1px solid rgba(15, 23, 42, 0.08)' }}>
             <CardContent>
-              <Stack direction="row" justifyContent="space-between" alignItems="center" sx={{ mb: 2 }}>
+              <Stack direction="row" sx={{ mb: 2, justifyContent:  'space-between', alignItems: 'center' }}>
                 <Box>
                   <Typography variant="h6" sx={{ fontWeight: 700 }}>Performance report</Typography>
                   <Typography variant="body2" color="text.secondary">Pass/fail breakdown across recent months</Typography>
@@ -751,7 +747,7 @@ const AdminDashboard: React.FC = () => {
 
           <Card sx={{ borderRadius: 3, border: '1px solid rgba(15, 23, 42, 0.08)' }}>
             <CardContent>
-              <Stack direction={{ xs: 'column', sm: 'row' }} spacing={2} justifyContent="space-between" alignItems={{ xs: 'stretch', sm: 'center' }} sx={{ mb: 2 }}>
+              <Stack direction={{ xs: 'column', sm: 'row' }} spacing={2} sx={{ mb: 2, justifyContent:  'space-between', alignItems: { xs: 'stretch', sm: 'center' } }}>
                 <Box>
                   <Typography variant="h6" sx={{ fontWeight: 700 }}>
                     Student roster
@@ -765,7 +761,7 @@ const AdminDashboard: React.FC = () => {
                   placeholder="Search students"
                   value={searchTerm}
                   onChange={(e) => setSearchTerm(e.target.value)}
-                  InputProps={{ startAdornment: <Search sx={{ mr: 1, color: 'text.secondary' }} /> }}
+                   slotProps={{ input: { startAdornment: <Search sx={{ mr: 1, color: 'text.secondary' }} /> } }}
                 />
               </Stack>
               <TableContainer>
@@ -782,7 +778,7 @@ const AdminDashboard: React.FC = () => {
                     {filteredStudents.map((student) => (
                       <TableRow key={student.id}>
                         <TableCell>
-                          <Stack direction="row" spacing={2} alignItems="center">
+                          <Stack direction="row" spacing={2} sx={{ alignItems: 'center' }}>
                             <Avatar sx={{ bgcolor: '#90caf9' }}>{(student.firstName?.[0] ?? '').toUpperCase()}{(student.lastName?.[0] ?? '').toUpperCase()}</Avatar>
                             <Box>
                               <Typography sx={{ fontWeight: 700 }}>{`${student.firstName} ${student.lastName}`}</Typography>
@@ -823,7 +819,7 @@ const AdminDashboard: React.FC = () => {
         <Box sx={{ display: 'grid', gap: 3 }}>
           <Card sx={{ borderRadius: 3, border: '1px solid rgba(15, 23, 42, 0.08)' }}>
             <CardContent>
-              <Stack direction={{ xs: 'column', sm: 'row' }} spacing={2} justifyContent="space-between" alignItems={{ xs: 'stretch', sm: 'center' }} sx={{ mb: 2 }}>
+              <Stack direction={{ xs: 'column', sm: 'row' }} spacing={2} sx={{ mb: 2, justifyContent:  'space-between', alignItems: { xs: 'stretch', sm: 'center' } }}>
                 <Box>
                   <Typography variant="h6" sx={{ fontWeight: 700 }}>
                     Audit trail
@@ -837,7 +833,7 @@ const AdminDashboard: React.FC = () => {
                   placeholder="Search log entries"
                   value={auditSearchTerm}
                   onChange={(e) => setAuditSearchTerm(e.target.value)}
-                  InputProps={{ startAdornment: <Search sx={{ mr: 1, color: 'text.secondary' }} /> }}
+                   slotProps={{ input: { startAdornment: <Search sx={{ mr: 1, color: 'text.secondary' }} /> } }}
                 />
               </Stack>
               <TableContainer>

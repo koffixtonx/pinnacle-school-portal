@@ -165,7 +165,7 @@ const Courses: React.FC = () => {
           <Typography variant="h4" sx={{ fontWeight: 700, mb: 1 }}>
             Courses
           </Typography>
-          <Typography variant="body2" color="textSecondary">
+          <Typography variant="body2" color="text.secondary">
             {isAdmin ? 'Manage courses, teaching assignments and enrollment.' : 'Your courses.'}
           </Typography>
         </Box>
@@ -182,7 +182,7 @@ const Courses: React.FC = () => {
 
       <Grid container spacing={2}>
         {courses.map((course) => (
-          <Grid key={course.id} xs={12} sm={6} md={4}>
+          <Grid key={course.id}    size={{ xs: 12, sm: 6, md: 4 }}>
             <Card sx={{ height: '100%', display: 'flex', flexDirection: 'column' }}>
               <CardContent sx={{ flexGrow: 1 }}>
                 <Box sx={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start' }}>
@@ -195,7 +195,7 @@ const Courses: React.FC = () => {
                 <Typography variant="body2" color="text.secondary" sx={{ mt: 1, mb: 2 }}>
                   {course.description || 'No description yet.'}
                 </Typography>
-                <Typography variant="caption" color="text.secondary" display="block">
+                <Typography variant="caption" color="text.secondary"  sx={{ display: "block" }}>
                   {course.teachers.length > 0
                     ? `Taught by ${course.teachers.map((t) => `${t.firstName} ${t.lastName}`).join(', ')}`
                     : 'No teacher assigned yet'}
@@ -224,7 +224,7 @@ const Courses: React.FC = () => {
           </Grid>
         ))}
         {courses.length === 0 && !loading && (
-          <Grid xs={12}>
+          <Grid  size={{ xs: 12 }}>
             <Typography variant="body2" color="text.secondary">
               No courses yet.
             </Typography>
@@ -273,7 +273,7 @@ const Courses: React.FC = () => {
           </TextField>
           <TextField
             select
-            SelectProps={{ multiple: true }}
+             slotProps={{ select: { multiple: true } }}
             label="Teachers"
             fullWidth
             margin="normal"

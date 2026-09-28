@@ -100,7 +100,7 @@ const Departments: React.FC = () => {
 
   return (
     <Box>
-      <Stack direction={{ xs: 'column', sm: 'row' }} justifyContent="space-between" alignItems={{ xs: 'flex-start', sm: 'center' }} sx={{ mb: 3 }}>
+      <Stack direction={{ xs: 'column', sm: 'row' }} sx={{ mb: 3, justifyContent:  'space-between', alignItems: { xs: 'flex-start', sm: 'center' } }}>
         <Box>
           <Typography variant="h4" sx={{ fontWeight: 700, mb: 1 }}>Faculties & Departments</Typography>
           <Typography variant="body2" color="text.secondary">Organize the university by faculty, department, and academic ownership.</Typography>

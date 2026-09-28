@@ -17,11 +17,11 @@ const CourseCatalog: React.FC = () => {
     {error && <Alert severity="error" sx={{ mb: 2 }}>{error}</Alert>}
     {!error && faculties.length === 0 && <CircularProgress />}
     {faculties.map((faculty) => <Accordion key={faculty.id} disableGutters>
-      <AccordionSummary expandIcon={<ExpandMoreIcon />}><Typography fontWeight={700}>{faculty.name}</Typography><Chip size="small" sx={{ ml: 1 }} label={`${faculty.departments.length} departments`} /></AccordionSummary>
+      <AccordionSummary expandIcon={<ExpandMoreIcon />}><Typography  sx={{ fontWeight: 700 }}>{faculty.name}</Typography><Chip size="small" sx={{ ml: 1 }} label={`${faculty.departments.length} departments`} /></AccordionSummary>
       <AccordionDetails><Stack spacing={1}>
         {faculty.departments.map((department) => <Accordion key={department.id} disableGutters variant="outlined">
           <AccordionSummary expandIcon={<ExpandMoreIcon />}><Typography>{department.name}</Typography><Chip size="small" sx={{ ml: 1 }} label={department.confidence} color={department.confidence === 'confirmed' ? 'success' : department.confidence === 'reference' ? 'warning' : 'default'} /></AccordionSummary>
-          <AccordionDetails>{department.courses.length === 0 ? <Typography variant="body2" color="text.secondary">Course information has not been researched for this department yet.</Typography> : <Stack spacing={1}>{department.courses.map((course) => <Box key={course.id} sx={{ borderLeft: 3, borderColor: 'primary.main', pl: 1.5 }}><Typography fontWeight={600}>{course.code} — {course.title}</Typography><Typography variant="caption" color="text.secondary">{course.creditUnits ?? '—'} credit units · Level {course.level} · Semester {course.semester ?? '—'}</Typography></Box>)}</Stack>}</AccordionDetails>
+          <AccordionDetails>{department.courses.length === 0 ? <Typography variant="body2" color="text.secondary">Course information has not been researched for this department yet.</Typography> : <Stack spacing={1}>{department.courses.map((course) => <Box key={course.id} sx={{ borderLeft: 3, borderColor: 'primary.main', pl: 1.5 }}><Typography  sx={{ fontWeight: 600 }}>{course.code} — {course.title}</Typography><Typography variant="caption" color="text.secondary">{course.creditUnits ?? '—'} credit units · Level {course.level} · Semester {course.semester ?? '—'}</Typography></Box>)}</Stack>}</AccordionDetails>
         </Accordion>)}
       </Stack></AccordionDetails>
     </Accordion>)}

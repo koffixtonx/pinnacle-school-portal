@@ -204,6 +204,7 @@ export default function DrawerAppBar(props: Props) {
           setNotifications(response.data?.data ?? []);
         }
       } catch (error) {
+        console.error('Notification poll failed', error);
         if (!cancelled) {
           setNotifications([]);
         }

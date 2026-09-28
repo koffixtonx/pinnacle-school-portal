@@ -111,7 +111,7 @@ const Teachers: React.FC = () => {
         <Typography variant="h4" sx={{ fontWeight: 700, mb: 1 }}>
           Teachers
         </Typography>
-        <Typography variant="body2" color="textSecondary">
+        <Typography variant="body2" color="text.secondary">
           Teaching staff at your school.
         </Typography>
         <Box sx={{ mt: 2 }}>

@@ -68,7 +68,7 @@ const Students: React.FC = () => {
   React.useEffect(() => {
     fetchStudents();
     if (canManageStudents) adminService.listDepartments().then((response) => setDepartments(response.data.data ?? [])).catch(() => undefined);
-  }, []);
+  }, [canManageStudents]);
 
   const handleSave = async () => {
     try {
@@ -129,7 +129,7 @@ const Students: React.FC = () => {
         <Typography variant="h4" sx={{ fontWeight: 700, mb: 1 }}>
           Students
         </Typography>
-        <Typography variant="body2" color="textSecondary">
+        <Typography variant="body2" color="text.secondary">
           Student roster for your school. New students are added via bulk import on the admin dashboard.
         </Typography>
       </Box>
@@ -221,7 +221,7 @@ const Students: React.FC = () => {
           {editingStudent && <TextField select label="Level" fullWidth margin="normal" value={form.studentLevel} onChange={(e) => setForm({ ...form, studentLevel: e.target.value })}>
             {['100', '200', '300', '400', '500'].map((level) => <option key={level} value={level}>{level} Level</option>)}
           </TextField>}
-          {editingStudent && <TextField label="Year admitted" type="number" fullWidth margin="normal" value={form.admittedYear} onChange={(e) => setForm({ ...form, admittedYear: e.target.value })} inputProps={{ min: 2000, max: 2100 }} />}
+          {editingStudent && <TextField label="Year admitted" type="number" fullWidth margin="normal" value={form.admittedYear} onChange={(e) => setForm({ ...form, admittedYear: e.target.value })}  slotProps={{ htmlInput: { min: 2000, max: 2100 } }} />}
           {editingStudent && <TextField select label="Department" fullWidth margin="normal" value={form.departmentId} onChange={(e) => setForm({ ...form, departmentId: e.target.value })}>
             <option value="">Unassigned</option>
             {departments.map((department) => <option key={department.id} value={department.id}>{department.code} - {department.name}</option>)}

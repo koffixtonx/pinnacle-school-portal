@@ -71,6 +71,10 @@ const Settings: React.FC = () => {
     darkMode: false,
   });
 
+  const [passwordForm, setPasswordForm] = React.useState({ newPassword: '', confirmPassword: '' });
+  const [savingPassword, setSavingPassword] = React.useState(false);
+  const [passwordMessage, setPasswordMessage] = React.useState<{ severity: 'success' | 'error'; text: string } | null>(null);
+
   const handleInputChange = (e: React.ChangeEvent<HTMLInputElement>) => {
     const { name, value } = e.target;
     setFormData((prev) => ({ ...prev, [name]: value }));
@@ -78,6 +82,30 @@ const Settings: React.FC = () => {
 
   const handleSettingChange = (key: keyof typeof settings) => {
     setSettings((prev) => ({ ...prev, [key]: !prev[key] }));
+  };
+
+  const openPasswordDialog = () => {
+    setPasswordForm({ newPassword: '', confirmPassword: '' });
+    setPasswordMessage(null);
+    setPasswordDialog(true);
+  };
+
+  const handleChangePassword = async () => {
+    if (passwordForm.newPassword !== passwordForm.confirmPassword) {
+      setPasswordMessage({ severity: 'error', text: 'The two passwords do not match.' });
+      return;
+    }
+    setSavingPassword(true);
+    setPasswordMessage(null);
+    try {
+      await authService.changePassword(passwordForm.newPassword);
+      setPasswordForm({ newPassword: '', confirmPassword: '' });
+      setPasswordMessage({ severity: 'success', text: 'Your password has been updated.' });
+    } catch (err: any) {
+      setPasswordMessage({ severity: 'error', text: err.response?.data?.message || 'Password could not be changed.' });
+    } finally {
+      setSavingPassword(false);
+    }
   };
 
   const handleProfileSave = async () => {
@@ -105,7 +133,7 @@ const Settings: React.FC = () => {
 
       <Grid container spacing={3}>
         {/* Profile Section */}
-        <Grid xs={12} md={6}>
+        <Grid size={{ xs: 12, md: 6 }}>
           <Card>
             <CardHeader
               title="Profile Information"
@@ -201,7 +229,7 @@ const Settings: React.FC = () => {
         </Grid>
 
         {/* Security & Preferences */}
-        <Grid xs={12} md={6}>
+        <Grid size={{ xs: 12, md: 6 }}>
           <Card>
             <CardHeader title="Security & Preferences" />
             <Divider />
@@ -214,7 +242,7 @@ const Settings: React.FC = () => {
                   variant="outlined"
                   startIcon={<PasswordIcon />}
                   fullWidth
-                  onClick={() => setPasswordDialog(true)}
+                  onClick={openPasswordDialog}
                   sx={{ mb: 1 }}
                 >
                   Change Password
@@ -290,7 +318,7 @@ const Settings: React.FC = () => {
         </Grid>
 
         {/* Support & Help */}
-        <Grid xs={12}>
+        <Grid  size={{ xs: 12 }}>
           <Card>
             <CardHeader title="Support & Help" />
             <Divider />
@@ -339,34 +367,38 @@ const Settings: React.FC = () => {
       <Dialog open={passwordDialog} onClose={() => setPasswordDialog(false)}>
         <DialogTitle>Change Password</DialogTitle>
         <DialogContent sx={{ minWidth: 400 }}>
+          {/* No "current password" field: Supabase only re-authenticates a session when the
+              email changes, so a value typed here could never be checked. */}
           <TextField
-            fullWidth
-            label="Current Password"
-            type="password"
-            margin="normal"
-          />
-          <TextField
+            autoFocus
             fullWidth
             label="New Password"
             type="password"
             margin="normal"
+            value={passwordForm.newPassword}
+            onChange={(e) => setPasswordForm((prev) => ({ ...prev, newPassword: e.target.value }))}
+            helperText="At least 8 characters."
           />
           <TextField
             fullWidth
             label="Confirm Password"
             type="password"
             margin="normal"
+            value={passwordForm.confirmPassword}
+            onChange={(e) => setPasswordForm((prev) => ({ ...prev, confirmPassword: e.target.value }))}
           />
+          {passwordMessage && <Alert severity={passwordMessage.severity} sx={{ mt: 2 }}>{passwordMessage.text}</Alert>}
         </DialogContent>
         <DialogActions>
           <Button onClick={() => setPasswordDialog(false)}>Cancel</Button>
           <Button
-            onClick={() => setPasswordDialog(false)}
+            onClick={handleChangePassword}
+            disabled={savingPassword || !passwordForm.newPassword}
             variant="contained"
             color="secondary"
             sx={{ color: '#08223c' }}
           >
-            Update Password
+            {savingPassword ? 'Updating…' : 'Update Password'}
           </Button>
         </DialogActions>
       </Dialog>

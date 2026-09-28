@@ -23,6 +23,9 @@ export default defineConfig([
       // and the React Compiler rule is not applicable to these data-fetching effects.
       '@typescript-eslint/no-explicit-any': 'off',
       'react-hooks/set-state-in-effect': 'off',
+      // `const { embed, ...rest } = row` is how the service layer drops the
+      // PostgREST embeds it has already folded into a shape the pages expect.
+      '@typescript-eslint/no-unused-vars': ['error', { args: 'after-used', ignoreRestSiblings: true, varsIgnorePattern: '^_', argsIgnorePattern: '^_' }],
     },
   },
 ])
