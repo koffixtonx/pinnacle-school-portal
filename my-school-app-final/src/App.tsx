@@ -1,6 +1,7 @@
 import React from 'react';
 import { BrowserRouter, Routes, Route, Navigate } from "react-router-dom";
 import { ThemeProvider } from '@mui/material/styles';
+import { SpeedInsights } from '@vercel/speed-insights/react';
 import DrawerAppBar from "./components/DrawerAppBar";
 import getTheme from "./theme";
 import { useCurrentUser, type Role } from './hooks/useCurrentUser';
@@ -196,6 +197,7 @@ function App() {
             </Routes>
           </React.Suspense>
         )}
+        <SpeedInsights />
       </BrowserRouter>
     </ThemeProvider>
   );
