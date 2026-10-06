@@ -2,10 +2,13 @@
 # Apply the migrations to a real Supabase project over its direct Postgres
 # connection. Run it yourself: it writes to the live database.
 #
-#   export SUPABASE_DB_URL='postgresql://postgres.<ref>:<password>@aws-0-<region>.pooler.supabase.com:6543/postgres'
+#   export SUPABASE_DB_URL='postgresql://postgres.<project-ref>:<password>@aws-0-<region>.pooler.supabase.com:6543/postgres?sslmode=require'
 #   sh supabase/scripts/apply-live.sh
 #
-# 6543 is the transaction pooler, 5432 the session pooler; either works here.
+# 6543 is the transaction pooler and 5432 the session pooler; either works here.
+# The project ref has to be carried in the *username* (`postgres.<ref>`): the
+# region endpoint serves every project, and connecting as plain `postgres` fails
+# with `FATAL: (ENOIDENTIFIER) no tenant identifier provided`.
 # The URL goes in the environment, never in a file that gets committed.
 set -e
 export PATH="/usr/lib/postgresql/18/bin:$PATH"
