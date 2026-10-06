@@ -22,8 +22,9 @@ generate — Supabase signs and rotates its own tokens.
 1. Apply the migrations to a **development** Supabase project (see below). Do not point local
    development at production data.
 2. `npm install`
-3. `cp .env.example .env.local` and fill in the project URL and anon key from
-   **Project Settings → API**.
+3. `cp .env.example .env.local` and fill in the project URL and the publishable key from
+   **Project Settings → API Keys**. Projects still on the older scheme use the `anon public`
+   JWT instead; both go in the same variable.
 4. `npm run dev` → http://localhost:5173
 
 `.env.local` is gitignored. Vite reads `.env*` files only from the project root and only
@@ -59,14 +60,16 @@ Only two, both public:
 
 ```env
 VITE_SUPABASE_URL=https://YOUR-PROJECT-REF.supabase.co
-VITE_SUPABASE_ANON_KEY=your-anon-public-key
+VITE_SUPABASE_ANON_KEY=sb_publishable_…      # or a legacy anon JWT, starting "eyJ"
 ```
 
-The anon key is safe to ship in the browser bundle because it only ever grants what Row Level
-Security allows. The `service_role` key and the database password must never appear in this
-repository or in a host's `VITE_` variables — anything inlined at build time is readable by
-anyone who loads the page. Use the `service_role` key only in a server-side context you control
-(the Supabase CLI, a scheduled job), never from the client.
+A publishable or anon key is safe to ship in the browser bundle because it only ever grants what
+Row Level Security allows. The `sb_secret_…` / `service_role` key and the database password must
+never appear in this repository or in a host's `VITE_` variables — anything inlined at build time
+is readable by anyone who loads the page, and a secret key bypasses RLS entirely. `src/services/supabase-config.ts`
+rejects a secret key in `VITE_SUPABASE_ANON_KEY` at start-up so this cannot happen silently. Use a
+secret key only in a server-side context you control (the Supabase CLI, a scheduled job), never
+from the client.
 
 Vite inlines these values when it builds, so changing a project URL or key requires a new
 deployment, not a restart.
@@ -125,7 +128,7 @@ school instead is also valid and gives you isolation at the cost of N migrations
 Two policies read across tenants by design, because the signed-out landing page has no tenant
 context to filter with: `tenants_read` (any ACTIVE school) and `site_settings_read_public`
 (`using (true)`). In a shared project every school's name, logo path, theme colours and welcome
-message are therefore publicly readable by anyone holding the anon key. Nothing else is, and no
+message are therefore publicly readable by anyone holding the publishable key. Nothing else is, and no
 write policy is unscoped - but if that exposure matters, give each school its own project.
 
 ## Pre-launch checklist

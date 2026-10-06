@@ -88,16 +88,17 @@ npm install
 cp .env.example .env.local
 ```
 
-Fill `.env.local` with the values from **Project Settings → API**:
+Fill `.env.local` with the values from **Project Settings → API Keys**:
 
 ```env
 VITE_SUPABASE_URL=https://YOUR-PROJECT-REF.supabase.co
-VITE_SUPABASE_ANON_KEY=your-anon-public-key
+VITE_SUPABASE_ANON_KEY=sb_publishable_…
 ```
 
-Both values ship inside the browser bundle and are public by design — the anon key only grants
-whatever Row Level Security allows. Never put the `service_role` key or the database password in
-this project; anything prefixed `VITE_` is readable by anyone who loads the site.
+Both values ship inside the browser bundle and are public by design — the publishable key (or a
+legacy `anon public` JWT, which also fits in that variable) only grants whatever Row Level Security
+allows. Never put a `sb_secret_…` / `service_role` key or the database password in this project;
+anything prefixed `VITE_` is readable by anyone who loads the site.
 
 ### 3. Create the first administrator
 

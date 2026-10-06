@@ -1,15 +1,9 @@
 import { createClient, type PostgrestError } from '@supabase/supabase-js';
+import { SUPABASE_ANON_KEY, SUPABASE_CONFIG_ERROR, SUPABASE_URL } from './supabase-config';
 
-const supabaseUrl = String(import.meta.env.VITE_SUPABASE_URL ?? '').trim();
-const supabaseAnonKey = String(import.meta.env.VITE_SUPABASE_ANON_KEY ?? '').trim();
+if (SUPABASE_CONFIG_ERROR) throw new Error(SUPABASE_CONFIG_ERROR);
 
-if (!supabaseUrl || !supabaseAnonKey) {
-  throw new Error(
-    'VITE_SUPABASE_URL and VITE_SUPABASE_ANON_KEY must be set. Copy .env.example to .env.local.',
-  );
-}
-
-export const supabase = createClient(supabaseUrl, supabaseAnonKey, {
+export const supabase = createClient(SUPABASE_URL, SUPABASE_ANON_KEY, {
   auth: {
     // Sessions live in the browser's own storage; Supabase refreshes the access
     // token automatically, so the old /auth/refresh round-trip is gone.

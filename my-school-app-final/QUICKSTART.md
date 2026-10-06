@@ -24,11 +24,12 @@ cp .env.example .env.local
 
 ```env
 VITE_SUPABASE_URL=https://YOUR-PROJECT-REF.supabase.co
-VITE_SUPABASE_ANON_KEY=your-anon-public-key
+VITE_SUPABASE_ANON_KEY=sb_publishable_…
 ```
 
-Both come from **Project Settings → API**. They are safe to expose: RLS decides what the anon key
-can reach. Never put the `service_role` key in this project.
+Both come from **Project Settings → API Keys**. They are safe to expose: RLS decides what the
+publishable key can reach. Older projects show an `anon public` JWT in the same place — either
+shape works. Never put a `sb_secret_…` / `service_role` key in this project.
 
 ### 3. Run it
 
@@ -88,8 +89,13 @@ whenever you add a policy.
 
 ## 🐛 Troubleshooting
 
-**Blank page, `VITE_SUPABASE_URL and VITE_SUPABASE_ANON_KEY must be set`**
-`.env.local` is missing or was created after `npm run dev` started. Restart Vite.
+**"Check the Supabase configuration" replaces the app**
+`.env.local` is missing, or a value is malformed — most often an anon key that lost its
+signature when it was selected instead of copied. The screen names the broken value. Vite
+inlines both variables at start-up, so an edit made after `npm run dev` began needs a restart.
+
+In development the console also logs `[supabase] <host> is unreachable` when the project host
+does not resolve, which means that project ref does not exist on Supabase.
 
 **`permission` / `row-level-security` errors in the console**
 A migration was skipped. `0003_rls.sql` must run after `0002_functions.sql`.
