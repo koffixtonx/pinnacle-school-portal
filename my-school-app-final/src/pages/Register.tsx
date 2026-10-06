@@ -17,6 +17,7 @@ const Register: React.FC = () => {
   const navigate = useNavigate();
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState('');
+  const [pendingEmail, setPendingEmail] = useState('');
   const [formData, setFormData] = useState({
     firstName: '',
     lastName: '',
@@ -36,6 +37,7 @@ const Register: React.FC = () => {
   const handleRegister = async (e: React.FormEvent) => {
     e.preventDefault();
     setError('');
+    setPendingEmail('');
 
     // Validation
     if (!formData.firstName || !formData.lastName || !formData.email || !formData.password) {
@@ -63,7 +65,15 @@ const Register: React.FC = () => {
         formData.password
       );
 
-      const { user, accessToken } = response.data;
+      const { user, accessToken, pendingConfirmation } = response.data;
+
+      // "Confirm email" is on in a default Supabase project, so this is the
+      // ordinary success path: the account and its profile exist, but there is
+      // no session to store yet and signing in is the next step.
+      if (pendingConfirmation || !accessToken || !user) {
+        setPendingEmail(formData.email);
+        return;
+      }
 
       // supabase-js keeps and refreshes the session itself; this copy is only
       // what App.tsx reads to decide whether to render the signed-in shell.
@@ -91,6 +101,13 @@ const Register: React.FC = () => {
             <Typography variant="body2" color="text.secondary" sx={{ mb: 3, textAlign: 'center' }}>
               Join Pinnacle University today
             </Typography>
+
+            {pendingEmail ? (
+              <Alert severity="success" sx={{ mb: 2 }}>
+                Account created. Open the confirmation link sent to {pendingEmail}, then{' '}
+                <Link to="/login" style={{ color: '#1976d2', fontWeight: 600 }}>sign in</Link>.
+              </Alert>
+            ) : null}
 
             {error && (
               <Alert severity="error" sx={{ mb: 2 }}>

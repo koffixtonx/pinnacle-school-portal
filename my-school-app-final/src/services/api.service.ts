@@ -34,7 +34,14 @@ async function profileOf(userId: string) {
     await supabase.from('profiles').select(PROFILE_COLUMNS).eq('id', userId).maybeSingle(),
     'Could not read your profile.',
   );
-  if (!row) throw new ServiceError('Your account has no profile yet. Sign out and try again.');
+  if (!row) {
+    // handle_new_auth_user() creates this row inside GoTrue's own insert, so its
+    // absence means 0002 or 0005 has not reached the database - naming that here
+    // is the difference between a diagnosable failure and a mysterious one.
+    throw new ServiceError(
+      'Your account has no profile yet: the database migrations are not fully applied.',
+    );
+  }
   return camel(row);
 }
 
@@ -48,11 +55,24 @@ export const authService = {
       options: { data: { firstName, lastName } },
     });
     if (error) throw toServiceError(error, 'Registration failed.');
-    if (!data.session || !data.user) {
-      throw new ServiceError('Check your inbox to confirm your email address before signing in.');
+    if (!data.user) throw new ServiceError('Registration failed. Please try again.');
+
+    // With "Confirm email" enabled - the default in a new Supabase project -
+    // signUp creates the account and returns no session. That is the success
+    // path, so it must not reach the page as an error: handle_new_auth_user()
+    // has already written the profile, and the only step left is the inbox.
+    if (!data.session) {
+      return { data: { success: true, accessToken: null, pendingConfirmation: true, user: null } };
     }
 
-    return { data: { success: true, accessToken: data.session.access_token, user: await profileOf(data.user.id) } };
+    return {
+      data: {
+        success: true,
+        accessToken: data.session.access_token,
+        pendingConfirmation: false,
+        user: await profileOf(data.user.id),
+      },
+    };
   },
 
   async login(email: string, password: string) {
