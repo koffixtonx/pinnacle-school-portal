@@ -40,6 +40,7 @@ grant insert, update, delete on public.profiles, public.faculties, public.depart
 ---------------------------------------------------------------------------
 -- Tenants: the public branding endpoint read the active tenant unauthenticated.
 ---------------------------------------------------------------------------
+drop policy if exists tenants_read on public.tenants;
 create policy tenants_read on public.tenants
   for select to anon, authenticated
   using (status = 'ACTIVE');
@@ -47,22 +48,26 @@ create policy tenants_read on public.tenants
 ---------------------------------------------------------------------------
 -- Profiles
 ---------------------------------------------------------------------------
+drop policy if exists profiles_read_same_tenant on public.profiles;
 create policy profiles_read_same_tenant on public.profiles
   for select to authenticated
   using (tenant_id = public.auth_tenant_id());
 
 -- Users edit their own name and phone; privileged columns are fenced off by
 -- guard_profile_update below. Admins may edit anything in their tenant.
+drop policy if exists profiles_update_self on public.profiles;
 create policy profiles_update_self on public.profiles
   for update to authenticated
   using (id = auth.uid())
   with check (id = auth.uid());
 
+drop policy if exists profiles_update_admin on public.profiles;
 create policy profiles_update_admin on public.profiles
   for update to authenticated
   using (tenant_id = public.auth_tenant_id() and public.is_admin())
   with check (tenant_id = public.auth_tenant_id() and public.is_admin());
 
+drop policy if exists profiles_delete_admin on public.profiles;
 create policy profiles_delete_admin on public.profiles
   for delete to authenticated
   using (tenant_id = public.auth_tenant_id() and public.is_admin());
@@ -107,42 +112,56 @@ create trigger guard_profile_update
 ---------------------------------------------------------------------------
 -- Academic structure: readable by anyone in the tenant, writable by admins.
 ---------------------------------------------------------------------------
+drop policy if exists faculties_read on public.faculties;
 create policy faculties_read on public.faculties
   for select to authenticated using (tenant_id = public.auth_tenant_id());
+drop policy if exists faculties_write on public.faculties;
 create policy faculties_write on public.faculties
   for insert to authenticated with check (tenant_id = public.auth_tenant_id() and public.is_admin());
+drop policy if exists faculties_update on public.faculties;
 create policy faculties_update on public.faculties
   for update to authenticated
   using (tenant_id = public.auth_tenant_id() and public.is_admin())
   with check (tenant_id = public.auth_tenant_id() and public.is_admin());
+drop policy if exists faculties_delete on public.faculties;
 create policy faculties_delete on public.faculties
   for delete to authenticated using (tenant_id = public.auth_tenant_id() and public.is_admin());
 
+drop policy if exists departments_read on public.departments;
 create policy departments_read on public.departments
   for select to authenticated using (tenant_id = public.auth_tenant_id());
+drop policy if exists departments_write on public.departments;
 create policy departments_write on public.departments
   for insert to authenticated with check (tenant_id = public.auth_tenant_id() and public.is_admin());
+drop policy if exists departments_update on public.departments;
 create policy departments_update on public.departments
   for update to authenticated
   using (tenant_id = public.auth_tenant_id() and public.is_admin())
   with check (tenant_id = public.auth_tenant_id() and public.is_admin());
+drop policy if exists departments_delete on public.departments;
 create policy departments_delete on public.departments
   for delete to authenticated using (tenant_id = public.auth_tenant_id() and public.is_admin());
 
+drop policy if exists courses_read on public.courses;
 create policy courses_read on public.courses
   for select to authenticated using (tenant_id = public.auth_tenant_id());
+drop policy if exists courses_write on public.courses;
 create policy courses_write on public.courses
   for insert to authenticated with check (tenant_id = public.auth_tenant_id() and public.is_admin());
+drop policy if exists courses_update on public.courses;
 create policy courses_update on public.courses
   for update to authenticated
   using (tenant_id = public.auth_tenant_id() and public.is_admin())
   with check (tenant_id = public.auth_tenant_id() and public.is_admin());
+drop policy if exists courses_delete on public.courses;
 create policy courses_delete on public.courses
   for delete to authenticated using (tenant_id = public.auth_tenant_id() and public.is_admin());
 
+drop policy if exists course_teachers_read on public.course_teachers;
 create policy course_teachers_read on public.course_teachers
   for select to authenticated
   using (exists (select 1 from public.courses c where c.id = course_id and c.tenant_id = public.auth_tenant_id()));
+drop policy if exists course_teachers_write on public.course_teachers;
 create policy course_teachers_write on public.course_teachers
   for all to authenticated
   using (
@@ -171,6 +190,7 @@ create policy course_teachers_write on public.course_teachers
 ---------------------------------------------------------------------------
 -- Enrollments
 ---------------------------------------------------------------------------
+drop policy if exists enrollments_read on public.enrollments;
 create policy enrollments_read on public.enrollments
   for select to authenticated
   using (
@@ -183,6 +203,7 @@ create policy enrollments_read on public.enrollments
   );
 
 -- A student may request their own enrolment; only admins enrol directly.
+drop policy if exists enrollments_insert_self on public.enrollments;
 create policy enrollments_insert_self on public.enrollments
   for insert to authenticated
   with check (
@@ -191,10 +212,12 @@ create policy enrollments_insert_self on public.enrollments
     and status = 'PENDING'
   );
 
+drop policy if exists enrollments_insert_admin on public.enrollments;
 create policy enrollments_insert_admin on public.enrollments
   for insert to authenticated
   with check (tenant_id = public.auth_tenant_id() and public.is_admin());
 
+drop policy if exists enrollments_update on public.enrollments;
 create policy enrollments_update on public.enrollments
   for update to authenticated
   using (
@@ -241,29 +264,36 @@ create trigger guard_enrollment_write
   before insert or update on public.enrollments
   for each row execute function public.guard_enrollment_write();
 
+drop policy if exists enrollments_delete on public.enrollments;
 create policy enrollments_delete on public.enrollments
   for delete to authenticated using (tenant_id = public.auth_tenant_id() and public.is_admin());
 
 ---------------------------------------------------------------------------
 -- Class sections
 ---------------------------------------------------------------------------
+drop policy if exists sections_read on public.class_sections;
 create policy sections_read on public.class_sections
   for select to authenticated using (tenant_id = public.auth_tenant_id());
+drop policy if exists sections_write on public.class_sections;
 create policy sections_write on public.class_sections
   for insert to authenticated with check (tenant_id = public.auth_tenant_id() and public.is_admin());
+drop policy if exists sections_update on public.class_sections;
 create policy sections_update on public.class_sections
   for update to authenticated
   using (tenant_id = public.auth_tenant_id() and public.is_admin())
   with check (tenant_id = public.auth_tenant_id() and public.is_admin());
+drop policy if exists sections_delete on public.class_sections;
 create policy sections_delete on public.class_sections
   for delete to authenticated using (tenant_id = public.auth_tenant_id() and public.is_admin());
 
+drop policy if exists section_students_read on public.class_section_students;
 create policy section_students_read on public.class_section_students
   for select to authenticated
   using (exists (
     select 1 from public.class_sections s
     where s.id = section_id and s.tenant_id = public.auth_tenant_id()
   ));
+drop policy if exists section_students_write on public.class_section_students;
 create policy section_students_write on public.class_section_students
   for all to authenticated
   using (
@@ -292,27 +322,35 @@ create policy section_students_write on public.class_section_students
 ---------------------------------------------------------------------------
 -- Timetable
 ---------------------------------------------------------------------------
+drop policy if exists timetable_read on public.timetable_slots;
 create policy timetable_read on public.timetable_slots
   for select to authenticated using (tenant_id = public.auth_tenant_id());
+drop policy if exists timetable_write on public.timetable_slots;
 create policy timetable_write on public.timetable_slots
   for insert to authenticated with check (tenant_id = public.auth_tenant_id() and public.is_admin());
+drop policy if exists timetable_update on public.timetable_slots;
 create policy timetable_update on public.timetable_slots
   for update to authenticated
   using (tenant_id = public.auth_tenant_id() and public.is_admin())
   with check (tenant_id = public.auth_tenant_id() and public.is_admin());
+drop policy if exists timetable_delete on public.timetable_slots;
 create policy timetable_delete on public.timetable_slots
   for delete to authenticated using (tenant_id = public.auth_tenant_id() and public.is_admin());
 
+drop policy if exists dept_timetable_read on public.department_timetable_slots;
 create policy dept_timetable_read on public.department_timetable_slots
   for select to authenticated using (tenant_id = public.auth_tenant_id());
+drop policy if exists dept_timetable_write on public.department_timetable_slots;
 create policy dept_timetable_write on public.department_timetable_slots
   for insert to authenticated with check (tenant_id = public.auth_tenant_id() and public.is_admin());
+drop policy if exists dept_timetable_delete on public.department_timetable_slots;
 create policy dept_timetable_delete on public.department_timetable_slots
   for delete to authenticated using (tenant_id = public.auth_tenant_id() and public.is_admin());
 
 ---------------------------------------------------------------------------
 -- Attendance: students see only their own, homeroom teachers only their class.
 ---------------------------------------------------------------------------
+drop policy if exists attendance_read on public.attendance_records;
 create policy attendance_read on public.attendance_records
   for select to authenticated
   using (
@@ -320,6 +358,7 @@ create policy attendance_read on public.attendance_records
     and (public.is_admin() or student_id = auth.uid() or public.owns_class_section(class_section_id))
   );
 
+drop policy if exists attendance_insert on public.attendance_records;
 create policy attendance_insert on public.attendance_records
   for insert to authenticated
   with check (
@@ -349,17 +388,20 @@ create trigger guard_attendance_write
   before insert on public.attendance_records
   for each row execute function public.guard_attendance_write();
 
+drop policy if exists attendance_update on public.attendance_records;
 create policy attendance_update on public.attendance_records
   for update to authenticated
   using (tenant_id = public.auth_tenant_id() and (public.is_admin() or public.owns_class_section(class_section_id)))
   with check (tenant_id = public.auth_tenant_id());
 
+drop policy if exists attendance_delete on public.attendance_records;
 create policy attendance_delete on public.attendance_records
   for delete to authenticated using (tenant_id = public.auth_tenant_id() and public.is_admin());
 
 ---------------------------------------------------------------------------
 -- Grades
 ---------------------------------------------------------------------------
+drop policy if exists grade_periods_read on public.grade_periods;
 create policy grade_periods_read on public.grade_periods
   for select to authenticated
   using (
@@ -374,6 +416,7 @@ create policy grade_periods_read on public.grade_periods
     )
   );
 
+drop policy if exists grade_periods_insert on public.grade_periods;
 create policy grade_periods_insert on public.grade_periods
   for insert to authenticated
   with check (
@@ -381,9 +424,11 @@ create policy grade_periods_insert on public.grade_periods
     and (public.is_admin() or public.teaches_course(course_id))
   );
 
+drop policy if exists grade_periods_delete on public.grade_periods;
 create policy grade_periods_delete on public.grade_periods
   for delete to authenticated using (tenant_id = public.auth_tenant_id() and public.is_admin());
 
+drop policy if exists grade_entries_read on public.grade_entries;
 create policy grade_entries_read on public.grade_entries
   for select to authenticated
   using (
@@ -440,6 +485,7 @@ create trigger guard_grade_entry_write
   before insert or update on public.grade_entries
   for each row execute function public.guard_grade_entry_write();
 
+drop policy if exists grade_entries_write on public.grade_entries;
 create policy grade_entries_write on public.grade_entries
   for insert to authenticated
   with check (
@@ -449,6 +495,7 @@ create policy grade_entries_write on public.grade_entries
     ))
   );
 
+drop policy if exists grade_entries_update on public.grade_entries;
 create policy grade_entries_update on public.grade_entries
   for update to authenticated
   using (
@@ -462,37 +509,47 @@ create policy grade_entries_update on public.grade_entries
 ---------------------------------------------------------------------------
 -- Fees
 ---------------------------------------------------------------------------
+drop policy if exists fee_structures_read on public.fee_structures;
 create policy fee_structures_read on public.fee_structures
   for select to authenticated using (tenant_id = public.auth_tenant_id());
+drop policy if exists fee_structures_write on public.fee_structures;
 create policy fee_structures_write on public.fee_structures
   for insert to authenticated with check (tenant_id = public.auth_tenant_id() and public.is_admin());
+drop policy if exists fee_structures_update on public.fee_structures;
 create policy fee_structures_update on public.fee_structures
   for update to authenticated
   using (tenant_id = public.auth_tenant_id() and public.is_admin())
   with check (tenant_id = public.auth_tenant_id() and public.is_admin());
 
+drop policy if exists invoices_read on public.invoices;
 create policy invoices_read on public.invoices
   for select to authenticated
   using (tenant_id = public.auth_tenant_id() and (public.is_admin() or student_id = auth.uid()));
+drop policy if exists invoices_insert on public.invoices;
 create policy invoices_insert on public.invoices
   for insert to authenticated
   with check (tenant_id = public.auth_tenant_id() and public.is_admin());
+drop policy if exists invoices_update on public.invoices;
 create policy invoices_update on public.invoices
   for update to authenticated
   using (tenant_id = public.auth_tenant_id() and public.is_admin())
   with check (tenant_id = public.auth_tenant_id() and public.is_admin());
 
+drop policy if exists invoice_lines_read on public.invoice_lines;
 create policy invoice_lines_read on public.invoice_lines
   for select to authenticated
   using (exists (select 1 from public.invoices i where i.id = invoice_id and (
     (i.tenant_id = public.auth_tenant_id() and public.is_admin()) or i.student_id = auth.uid())));
+drop policy if exists invoice_lines_insert on public.invoice_lines;
 create policy invoice_lines_insert on public.invoice_lines
   for insert to authenticated
   with check (exists (select 1 from public.invoices i where i.id = invoice_id and i.tenant_id = public.auth_tenant_id() and public.is_admin()));
 
+drop policy if exists payments_read on public.payments;
 create policy payments_read on public.payments
   for select to authenticated
   using (tenant_id = public.auth_tenant_id() and (public.is_admin() or student_id = auth.uid()));
+drop policy if exists payments_insert on public.payments;
 create policy payments_insert on public.payments
   for insert to authenticated
   with check (tenant_id = public.auth_tenant_id() and public.is_admin());
@@ -500,38 +557,50 @@ create policy payments_insert on public.payments
 ---------------------------------------------------------------------------
 -- Audit log, bulk jobs, notifications, settings
 ---------------------------------------------------------------------------
+drop policy if exists audit_logs_read on public.audit_logs;
 create policy audit_logs_read on public.audit_logs
   for select to authenticated using (tenant_id = public.auth_tenant_id() and public.is_admin());
 -- Writes happen only from the SECURITY DEFINER audit trigger.
 
+drop policy if exists bulk_jobs_read on public.bulk_import_jobs;
 create policy bulk_jobs_read on public.bulk_import_jobs
   for select to authenticated using (tenant_id = public.auth_tenant_id() and public.is_admin());
+drop policy if exists bulk_jobs_write on public.bulk_import_jobs;
 create policy bulk_jobs_write on public.bulk_import_jobs
   for insert to authenticated with check (tenant_id = public.auth_tenant_id() and public.is_admin());
+drop policy if exists bulk_jobs_update on public.bulk_import_jobs;
 create policy bulk_jobs_update on public.bulk_import_jobs
   for update to authenticated
   using (tenant_id = public.auth_tenant_id() and public.is_admin())
   with check (tenant_id = public.auth_tenant_id() and public.is_admin());
 
+drop policy if exists notifications_read on public.notifications;
 create policy notifications_read on public.notifications
   for select to authenticated using (tenant_id = public.auth_tenant_id());
+drop policy if exists notifications_write on public.notifications;
 create policy notifications_write on public.notifications
   for insert to authenticated with check (tenant_id = public.auth_tenant_id() and public.is_admin());
+drop policy if exists notifications_delete on public.notifications;
 create policy notifications_delete on public.notifications
   for delete to authenticated using (tenant_id = public.auth_tenant_id() and public.is_admin());
 
+drop policy if exists notification_reads_select on public.notification_reads;
 create policy notification_reads_select on public.notification_reads
   for select to authenticated using (user_id = auth.uid());
+drop policy if exists notification_reads_insert on public.notification_reads;
 create policy notification_reads_insert on public.notification_reads
   for insert to authenticated with check (user_id = auth.uid());
 
 -- Read unauthenticated: the public welcome page shows branding before login.
+drop policy if exists site_settings_read_public on public.site_settings;
 create policy site_settings_read_public on public.site_settings
   for select to anon, authenticated using (true);
+drop policy if exists site_settings_update_admin on public.site_settings;
 create policy site_settings_update_admin on public.site_settings
   for update to authenticated
   using (tenant_id = public.auth_tenant_id() and public.is_admin())
   with check (tenant_id = public.auth_tenant_id() and public.is_admin());
+drop policy if exists site_settings_insert_admin on public.site_settings;
 create policy site_settings_insert_admin on public.site_settings
   for insert to authenticated with check (tenant_id = public.auth_tenant_id() and public.is_admin());
 

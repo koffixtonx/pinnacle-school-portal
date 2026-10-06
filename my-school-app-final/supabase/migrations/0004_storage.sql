@@ -10,19 +10,23 @@ on conflict (id) do update
       allowed_mime_types = excluded.allowed_mime_types;
 
 -- Anyone may view branding; only school admins may add or replace objects.
+drop policy if exists branding_public_read on storage.objects;
 create policy branding_public_read on storage.objects
   for select to anon, authenticated
   using (bucket_id in ('branding', 'welcome-backgrounds'));
 
+drop policy if exists branding_admin_insert on storage.objects;
 create policy branding_admin_insert on storage.objects
   for insert to authenticated
   with check (bucket_id in ('branding', 'welcome-backgrounds') and public.is_admin());
 
+drop policy if exists branding_admin_update on storage.objects;
 create policy branding_admin_update on storage.objects
   for update to authenticated
   using (bucket_id in ('branding', 'welcome-backgrounds') and public.is_admin())
   with check (bucket_id in ('branding', 'welcome-backgrounds') and public.is_admin());
 
+drop policy if exists branding_admin_delete on storage.objects;
 create policy branding_admin_delete on storage.objects
   for delete to authenticated
   using (
