@@ -21,9 +21,14 @@ pg_ctl -D ~/.local/share/pinnacle-sbcheck \
 sh supabase/tests/local/apply.sh
 ```
 
-`apply.sh` exits non-zero on the first failed assertion and prints `FAILED <label> -> detail`
-for each one. Re-running it recreates the `sbcheck` database from scratch, so fixtures stay
-deterministic.
+`apply.sh` exits non-zero on the first failed statement and prints the step's own output
+when it has something to say, including the final `assertions: 49 failed: 0`. Re-running it
+recreates the `sbcheck` database from scratch, so fixtures stay deterministic.
+
+`0002`-`0005` are then applied a **second** time, deliberately: re-running must be a no-op,
+because a migration interrupted half-way has to be recoverable by running the whole file
+again. `0001` is excluded from that second pass - `create table` on an existing table should
+fail loudly rather than be papered over.
 
 ## What it covers
 
@@ -36,3 +41,10 @@ deterministic.
 Assertions run as `authenticated` or `anon` with a forged JWT claim, through
 `SECURITY INVOKER` helpers - a definer helper would execute as its owner and every RLS check
 would pass vacuously.
+
+## Against the hosted project
+
+`supabase/scripts/apply-live.sh` runs these same migration files over a direct database
+connection, one transaction per file, then reloads the API's schema cache. The local suite
+here stays read-only; that script is the one that writes, so it takes the connection
+information from the environment and is meant to be run by hand.
