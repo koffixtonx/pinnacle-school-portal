@@ -15,9 +15,20 @@ if (SUPABASE_CONFIG_ERROR) {
         {SUPABASE_CONFIG_ERROR}
       </pre>
       <p>
-        Both values come from Project Settings &rarr; API in the Supabase dashboard. Put them in{' '}
-        <code>.env.local</code>, then restart <code>npm run dev</code> — Vite inlines them at
-        start-up, so an edit made after the server launched is not picked up.
+        Both values come from Project Settings &rarr; API in the Supabase dashboard.{' '}
+        {import.meta.env.DEV ? (
+          <>
+            Put them in <code>.env.local</code>, then restart <code>npm run dev</code> — Vite
+            inlines them at start-up, so an edit made after the server launched is not picked up.
+          </>
+        ) : (
+          <>
+            This bundle was built without them. Set <code>VITE_SUPABASE_URL</code> and{' '}
+            <code>VITE_SUPABASE_ANON_KEY</code> as environment variables where the site is built,
+            then redeploy — they are inlined at build time, so the live deployment keeps its old
+            bundle until a new one is built.
+          </>
+        )}
       </p>
     </div>,
   )
