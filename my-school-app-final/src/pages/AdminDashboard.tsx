@@ -10,7 +10,6 @@ import {
   CircularProgress,
   Container,
   Divider,
-  FormControlLabel,
   LinearProgress,
   MenuItem,
   Select,
@@ -39,6 +38,7 @@ import {
 } from '@mui/icons-material';
 import { useNavigate } from 'react-router-dom';
 import MenuIcon from '@mui/icons-material/Menu';
+import CloseIcon from '@mui/icons-material/Close';
 import SettingsIcon from '@mui/icons-material/Settings';
 import { BarChart, Bar, XAxis, YAxis, Tooltip, Legend, ResponsiveContainer, LineChart, Line, AreaChart, Area } from 'recharts';
 import { adminService, notificationsService, siteSettingsService } from '../services/api.service';
@@ -336,7 +336,7 @@ const AdminDashboard: React.FC = () => {
   };
 
   return (
-    <Container maxWidth="xl" sx={{ py: 4, minHeight: '100vh' }}>
+    <Container maxWidth="xl" sx={{ py: 4, minHeight: '100dvh' }}>
       <Card sx={{ mb: 3, borderRadius: 3, border: '1px solid rgba(148, 163, 184, 0.25)', bgcolor: 'rgba(15, 23, 42, 0.88)', color: 'common.white' }}>
         <CardContent sx={{ py: 2.25 }}>
           <Typography variant="h5" sx={{ fontWeight: 700, textAlign: 'center', color: welcomeMessageColor }}>{displayedWelcomeMessage}</Typography>
@@ -352,34 +352,49 @@ const AdminDashboard: React.FC = () => {
         }}
       >
         <CardContent>
-          <Stack direction={{ xs: 'column', md: 'row' }} spacing={2} sx={{ justifyContent: 'space-between', alignItems: { xs: 'flex-start', md: 'center' } }}>
+          <Stack
+            direction={{ xs: 'column', md: 'row' }}
+            spacing={2}
+            sx={{ justifyContent: 'space-between', alignItems: { xs: 'flex-start', md: 'center' }, flexWrap: 'wrap', rowGap: 2 }}
+          >
             <Box>
               <Typography variant="overline" sx={{ letterSpacing: 1.8, opacity: 0.8 }}>
                 School administration
               </Typography>
-              <Typography variant="h3" sx={{ fontWeight: 700, mb: 1 }}>
+              <Typography variant="h3" sx={{ fontWeight: 700, mb: 1, fontSize: { xs: '1.9rem', sm: '2.4rem', md: '2.85rem' }, lineHeight: 1.12 }}>
                 Command Center
               </Typography>
               <Typography variant="body1" sx={{ maxWidth: 640, opacity: 0.9 }}>
                 Monitor student growth, attendance, fee collections, and system activity from one polished workspace.
               </Typography>
             </Box>
-            <Stack direction={{ xs: 'column', sm: 'row' }} spacing={1.5} sx={{ alignItems: 'center' }}>
-              <IconButton onClick={() => setDrawerOpen(true)} sx={{ color: 'white' }} aria-label="open-options">
-                <MenuIcon />
-              </IconButton>
+            <Stack
+              direction={{ xs: 'column', sm: 'row' }}
+              spacing={1.5}
+              useFlexGap
+              sx={{ flexWrap: 'wrap', alignItems: { xs: 'stretch', sm: 'center' }, width: { xs: '100%', md: 'auto' } }}
+            >
+              <Button
+                variant="text"
+                startIcon={<MenuIcon />}
+                onClick={() => setDrawerOpen(true)}
+                aria-label="open options"
+                sx={{ color: 'white', whiteSpace: 'nowrap', justifyContent: 'flex-start', '&:hover': { backgroundColor: 'rgba(255,255,255,0.12)' } }}
+              >
+                Admin options
+              </Button>
               <Button
                 variant="contained"
-                color="secondary"
                 startIcon={<Refresh />}
                 onClick={() => void refreshDashboard()}
                 disabled={loading}
+                sx={{ whiteSpace: 'nowrap', color: 'common.white', bgcolor: 'rgba(255,255,255,0.16)', '&:hover': { bgcolor: 'rgba(255,255,255,0.26)' }, '&.Mui-disabled': { color: 'rgba(255,255,255,0.5)' } }}
               >
                 Refresh
               </Button>
               <Button
                 variant="outlined"
-                sx={{ color: 'white', borderColor: 'rgba(255,255,255,0.35)', '&:hover': { borderColor: 'white', backgroundColor: 'rgba(255,255,255,0.12)' } }}
+                sx={{ whiteSpace: 'nowrap', color: 'white', borderColor: 'rgba(255,255,255,0.35)', '&:hover': { borderColor: 'white', backgroundColor: 'rgba(255,255,255,0.12)' } }}
                 startIcon={<SettingsIcon />}
                 onClick={() => navigate('/site-customization')}
               >
@@ -391,19 +406,15 @@ const AdminDashboard: React.FC = () => {
       </Card>
 
       <Drawer anchor="right" open={drawerOpen} onClose={() => setDrawerOpen(false)}>
-        <Box sx={{ width: 320, p: 2 }} role="presentation">
-          <Stack direction="row" sx={{ mb: 2, justifyContent:  'space-between', alignItems: 'center' }}>
+        <Box sx={{ width: { xs: 'min(84vw, 320px)', sm: 320 }, p: 2 }} role="presentation">
+          <Stack direction="row" sx={{ mb: 2, justifyContent: 'space-between', alignItems: 'center' }}>
             <Typography variant="h6">Admin Options</Typography>
-            <IconButton onClick={() => setDrawerOpen(false)}><MenuIcon /></IconButton>
+            <IconButton onClick={() => setDrawerOpen(false)} aria-label="close options">
+              <CloseIcon />
+            </IconButton>
           </Stack>
           <Button fullWidth variant="outlined" startIcon={<SettingsIcon />} sx={{ mb: 1 }} onClick={() => navigate('/site-customization')}>Open Site Customization</Button>
           <Button fullWidth variant="outlined" sx={{ mb: 1 }} onClick={() => { navigator.clipboard?.writeText(window.location.href); }}>Copy Page URL</Button>
-          <Divider sx={{ my: 2 }} />
-          <Typography variant="subtitle2" sx={{ mb: 1 }}>Quick Toggles</Typography>
-          <Stack spacing={1}>
-            <FormControlLabel control={<input type="checkbox" />} label="Toggle Announcements" />
-            <FormControlLabel control={<input type="checkbox" />} label="Toggle Calendar" />
-          </Stack>
         </Box>
       </Drawer>
 
@@ -688,7 +699,7 @@ const AdminDashboard: React.FC = () => {
                 Fee collection activity
               </Typography>
               {fees && fees.monthlyCollection.length > 0 ? (
-                <TableContainer>
+                <TableContainer sx={{ overflowX: 'auto' }}>
                   <Table size="small">
                     <TableHead>
                       <TableRow>
@@ -764,7 +775,7 @@ const AdminDashboard: React.FC = () => {
                    slotProps={{ input: { startAdornment: <Search sx={{ mr: 1, color: 'text.secondary' }} /> } }}
                 />
               </Stack>
-              <TableContainer>
+              <TableContainer sx={{ overflowX: 'auto' }}>
                 <Table>
                   <TableHead>
                     <TableRow>
@@ -836,7 +847,7 @@ const AdminDashboard: React.FC = () => {
                    slotProps={{ input: { startAdornment: <Search sx={{ mr: 1, color: 'text.secondary' }} /> } }}
                 />
               </Stack>
-              <TableContainer>
+              <TableContainer sx={{ overflowX: 'auto' }}>
                 <Table>
                   <TableHead>
                     <TableRow>

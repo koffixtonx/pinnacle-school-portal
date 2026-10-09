@@ -425,12 +425,16 @@ begin
     raw_app_meta_data, raw_user_meta_data, created_at, updated_at,
     confirmation_token, recovery_token, email_change, email_change_token_new,
     email_change_token_current, phone, phone_change, phone_change_token,
-    is_sso_user, deleted_at
+    is_sso_user, deleted_at, instance_id
   ) values (
     v_user_id, 'authenticated', 'authenticated', v_email, crypt(p_password, gen_salt('bf')), now(),
     '{"provider":"email","providers":["email"]}'::jsonb,
     jsonb_build_object('firstName', p_first_name, 'lastName', p_last_name, 'role', p_role),
-    now(), now(), '', '', '', '', '', null, '', '', false, null
+    now(), now(), '', '', '', '', '', null, '', '', false, null,
+    -- GoTrue scopes every credential lookup to an instance and leaves the column
+    -- NULL for a hand-written insert, so a NULL here makes password sign-in fail
+    -- with invalid_credentials even though the bcrypt hash itself verifies.
+    '00000000-0000-0000-0000-000000000000'::uuid
   );
 
   -- auth.identities has no `status` column on hosted GoTrue, and its email

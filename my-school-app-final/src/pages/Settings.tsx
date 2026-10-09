@@ -364,9 +364,9 @@ const Settings: React.FC = () => {
       </Grid>
 
       {/* Password Change Dialog */}
-      <Dialog open={passwordDialog} onClose={() => setPasswordDialog(false)}>
+      <Dialog open={passwordDialog} onClose={() => setPasswordDialog(false)} fullWidth maxWidth="xs">
         <DialogTitle>Change Password</DialogTitle>
-        <DialogContent sx={{ minWidth: 400 }}>
+        <DialogContent>
           {/* No "current password" field: Supabase only re-authenticates a session when the
               email changes, so a value typed here could never be checked. */}
           <TextField

@@ -136,7 +136,7 @@ const Departments: React.FC = () => {
       <Card>
         <CardContent>
           <Typography variant="h6" sx={{ fontWeight: 700, mb: 2 }}>Department directory</Typography>
-          {loading ? <CircularProgress /> : <TableContainer><Table>
+          {loading ? <CircularProgress /> : <TableContainer sx={{ overflowX: 'auto' }}><Table>
             <TableHead><TableRow><TableCell>Department</TableCell><TableCell>Code</TableCell><TableCell>Faculty</TableCell><TableCell>Students</TableCell><TableCell>Courses</TableCell></TableRow></TableHead>
             <TableBody>
               {departments.map((department) => <TableRow key={department.id}><TableCell sx={{ fontWeight: 600 }}>{department.name}</TableCell><TableCell>{department.code}</TableCell><TableCell>{department.faculty.name}</TableCell><TableCell>{department._count?.students ?? 0}</TableCell><TableCell>{department._count?.courses ?? 0}</TableCell></TableRow>)}

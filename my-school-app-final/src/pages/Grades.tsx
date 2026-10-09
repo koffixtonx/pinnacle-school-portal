@@ -191,7 +191,7 @@ const Grades: React.FC = () => {
           </Box>
 
           {selectedCourse && selectedPeriod && enrollments.length > 0 && (
-            <TableContainer sx={{ mt: 2 }}>
+            <TableContainer sx={{ mt: 2, overflowX: 'auto' }}>
               <Table size="small">
                 <TableHead>
                   <TableRow>
@@ -240,7 +240,7 @@ const Grades: React.FC = () => {
       {loading && <CircularProgress sx={{ mb: 2 }} />}
 
       <Card>
-        <TableContainer>
+        <TableContainer sx={{ overflowX: 'auto' }}>
           <Table>
             <TableHead>
               <TableRow>

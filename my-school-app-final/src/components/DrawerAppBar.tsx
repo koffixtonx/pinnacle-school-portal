@@ -43,7 +43,8 @@ import MenuItem from '@mui/material/MenuItem';
 import Switch from '@mui/material/Switch';
 import Tooltip from '@mui/material/Tooltip';
 import { authService, notificationsService } from '../services/api.service';
-import { styled, alpha } from '@mui/material/styles';
+import { styled, alpha, useTheme } from '@mui/material/styles';
+import useMediaQuery from '@mui/material/useMediaQuery';
 import { useNavigate } from 'react-router-dom';
 
 interface NotificationItem {
@@ -73,6 +74,8 @@ const Search = styled('div')(({ theme }) => ({
   },
   marginRight: theme.spacing(2),
   marginLeft: 0,
+  minWidth: 0,
+  flexShrink: 1,
   width: '100%',
   [theme.breakpoints.up('sm')]: {
     marginLeft: theme.spacing(3),
@@ -97,8 +100,9 @@ const StyledInputBase = styled(InputBase)(({ theme }) => ({
     paddingLeft: `calc(1em + ${theme.spacing(4)})`,
     transition: theme.transitions.create('width'),
     width: '100%',
+    maxWidth: '100%',
     [theme.breakpoints.up('md')]: {
-      width: '20ch',
+      width: '30ch',
     },
   },
 }));
@@ -185,6 +189,12 @@ export default function DrawerAppBar(props: Props) {
   const location = useLocation();
   const navigate = useNavigate();
   const currentYear = new Date().getFullYear();
+
+  const theme = useTheme();
+  const isDesktop = useMediaQuery(theme.breakpoints.up('md'));
+  React.useEffect(() => {
+    if (isDesktop) setMobileOpen(false);
+  }, [isDesktop]);
 
   const currentUser = useCurrentUser();
   const isAuthenticated = Boolean(currentUser);
@@ -289,6 +299,8 @@ export default function DrawerAppBar(props: Props) {
     () => navItems.filter((item) => !item.roles || (currentUser && item.roles.includes(currentUser.role))),
     [currentUser]
   );
+  const pageTitle =
+    visibleNavItems.find((item) => item.to === location.pathname)?.label ?? 'Pinnacle University';
 
   const drawer = (
     <Box onClick={handleDrawerToggle} sx={{ textAlign: 'left', height: '100%', display: 'flex', flexDirection: 'column' }}>
@@ -360,7 +372,7 @@ export default function DrawerAppBar(props: Props) {
   const container = window !== undefined ? () => window().document.body : undefined;
 
   return (
-    <Box sx={{ display: 'flex', height: '100vh', overflow: 'hidden' }}>
+    <Box sx={{ display: 'flex', height: '100dvh', overflow: 'hidden' }}>
       <CssBaseline />
       <AppBar
         component="nav"
@@ -369,15 +381,15 @@ export default function DrawerAppBar(props: Props) {
           background: 'linear-gradient(90deg, #08223c 0%, #12355b 62%, #1f5f8b 100%)',
           borderBottom: '1px solid rgba(255,255,255,0.16)',
           boxShadow: '0 12px 35px rgba(8,34,60,0.22)',
-          width: { sm: `calc(100% - ${drawerWidth}px)` },
-          ml: { sm: `${drawerWidth}px` },
+          width: { xs: '100%', md: `calc(100% - ${drawerWidth}px)` },
+          ml: { xs: 0, md: `${drawerWidth}px` },
         }}
       >
         <Toolbar
           sx={{
             display: 'flex',
-            flexWrap: { xs: 'nowrap', md: 'wrap' },
-            gap: 1.25,
+            flexWrap: 'nowrap',
+            gap: { xs: 0.75, sm: 1.25 },
             alignItems: 'center',
             justifyContent: 'space-between',
             minHeight: { xs: 54, sm: 58 },
@@ -391,40 +403,48 @@ export default function DrawerAppBar(props: Props) {
             edge="start"
             onClick={handleDrawerToggle}
             size="small"
-            sx={{ mr: 0.5, display: { sm: 'none' } }}
+            sx={{ mr: 0.5, display: { md: 'none' } }}
           >
             <MenuIcon />
           </IconButton>
           
-          <Box sx={{ display: 'flex', alignItems: 'center', gap: 1, flexGrow: 0, minWidth: 0 }}>
+          <Box sx={{ display: { xs: 'flex', md: 'none' }, alignItems: 'center', gap: 1, flexGrow: 1, minWidth: 0 }}>
             <Logo size={32} />
-            <Box sx={{ display: { xs: 'none', sm: 'block' } }}>
+            <Box sx={{ minWidth: 0, display: { xs: 'none', sm: 'block' } }}>
               <Typography
                 variant="subtitle1"
                 component="div"
                 noWrap
-                sx={{ fontWeight: 700, color: 'common.white', lineHeight: 1.1, maxWidth: { sm: 180, md: 'none' } }}
+                sx={{ fontWeight: 700, color: 'common.white', lineHeight: 1.1, minWidth: 0, maxWidth: { sm: 180, lg: 'none' } }}
               >
                 Pinnacle University
               </Typography>
               <Typography
                 variant="caption"
                 noWrap
-                sx={{ color: 'common.white', display: 'block', opacity: 0.85, lineHeight: 1.1, maxWidth: { sm: 180, md: 'none' } }}
+                sx={{ color: 'common.white', display: { xs: 'none', sm: 'block' }, opacity: 0.85, lineHeight: 1.1, maxWidth: { sm: 180, lg: 'none' } }}
               >
                 Where Ambition Meets Achievement
               </Typography>
-              {isAuthenticated && currentUser?.firstName && (
-                <Typography
-                  variant="caption"
-                  noWrap
-                  sx={{ color: 'common.white', display: { xs: 'none', sm: 'block' }, opacity: 0.95, lineHeight: 1.1, maxWidth: { sm: 180, md: 'none' } }}
-                >
-                  Welcome, {currentUser.firstName}
-                </Typography>
-              )}
             </Box>
           </Box>
+
+          <Typography
+            variant="h6"
+            component="div"
+            noWrap
+            sx={{
+              display: { xs: 'none', md: 'block' },
+              minWidth: 0,
+              maxWidth: 420,
+              fontWeight: 700,
+              fontSize: '1.05rem',
+              lineHeight: 1.2,
+              color: 'common.white',
+            }}
+          >
+            {pageTitle}
+          </Typography>
 
           <Search sx={{ display: { xs: 'none', lg: 'block' } }}>
             <SearchIconWrapper>
@@ -441,7 +461,6 @@ export default function DrawerAppBar(props: Props) {
           <IconButton
             color="inherit"
             size="small"
-            sx={{ display: { xs: 'none', sm: 'flex' } }}
             aria-label="notifications"
             onClick={handleNotificationMenuOpen}
           >
@@ -511,19 +530,23 @@ export default function DrawerAppBar(props: Props) {
               variant="outlined"
               onClick={handleProfileMenu}
               startIcon={<AccountCircleIcon />}
+              aria-label="account menu"
               sx={{
                 borderColor: 'rgba(255,255,255,0.24)',
                 color: 'common.white',
                 textTransform: 'none',
                 minWidth: 'auto',
-                px: { xs: 1.25, sm: 1.5 },
+                px: { xs: 0.75, sm: 1.5 },
+                '& .MuiButton-startIcon': { mr: { xs: 0, sm: 1 } },
                 '&:hover': {
                   borderColor: 'rgba(255,255,255,0.4)',
                   bgcolor: 'rgba(255,255,255,0.12)',
                 },
               }}
             >
-              {currentUser?.firstName || 'Account'}
+              <Box component="span" sx={{ display: { xs: 'none', sm: 'inline' } }}>
+                {currentUser?.firstName || 'Account'}
+              </Box>
             </Button>
           ) : (
             <Button
@@ -533,18 +556,20 @@ export default function DrawerAppBar(props: Props) {
               size="small"
               variant="outlined"
               startIcon={<AccountCircleIcon />}
+              aria-label="login"
               sx={{
                 borderColor: 'rgba(255,255,255,0.24)',
                 color: 'common.white',
                 textTransform: 'none',
-                px: { xs: 1.25, sm: 1.5 },
+                px: { xs: 0.75, sm: 1.5 },
+                '& .MuiButton-startIcon': { mr: { xs: 0, sm: 1 } },
                 '&:hover': {
                   borderColor: 'rgba(255,255,255,0.4)',
                   bgcolor: 'rgba(255,255,255,0.12)',
                 },
               }}
             >
-              Login
+              <Box component="span" sx={{ display: { xs: 'none', sm: 'inline' } }}>Login</Box>
             </Button>
           )}
         </Toolbar>
@@ -562,8 +587,8 @@ export default function DrawerAppBar(props: Props) {
               overflow: 'visible',
               filter: 'drop-shadow(0px 2px 8px rgba(0,0,0,0.32))',
               mt: 1.5,
-              width: 360,
-              maxHeight: 420,
+              width: { xs: 'calc(100vw - 24px)', sm: 360 },
+              maxHeight: 'min(420px, 70dvh)',
               overflowY: 'auto',
             },
           },
@@ -639,6 +664,7 @@ export default function DrawerAppBar(props: Props) {
               overflow: 'visible',
               filter: 'drop-shadow(0px 2px 8px rgba(0,0,0,0.32))',
               mt: 1.5,
+              maxWidth: 'calc(100vw - 16px)',
             },
           },
         }}
@@ -657,27 +683,14 @@ export default function DrawerAppBar(props: Props) {
         </MenuItem>
       </Menu>
 
-      <Box component="nav" sx={{ width: { sm: drawerWidth }, flexShrink: { sm: 0 } }}>
+      <Box component="nav" sx={{ width: { xs: 0, md: drawerWidth }, flexShrink: 0 }}>
         <Drawer
           container={container}
-          variant="temporary"
-          open={mobileOpen}
+          variant={isDesktop ? 'permanent' : 'temporary'}
+          open={isDesktop || mobileOpen}
           onClose={handleDrawerToggle}
-          ModalProps={{
-            keepMounted: true,
-          }}
+          ModalProps={{ keepMounted: true }}
           sx={{
-            display: { xs: 'block', sm: 'none' },
-            '& .MuiDrawer-paper': { boxSizing: 'border-box', width: drawerWidth },
-          }}
-        >
-          {drawer}
-        </Drawer>
-        <Drawer
-          variant="permanent"
-          open
-          sx={{
-            display: { xs: 'none', sm: 'block' },
             '& .MuiDrawer-paper': {
               boxSizing: 'border-box',
               width: drawerWidth,
@@ -692,8 +705,9 @@ export default function DrawerAppBar(props: Props) {
       <Box
         component="main"
         sx={{
-          width: { sm: `calc(100% - ${drawerWidth}px)` },
-          height: '100vh',
+          width: { xs: '100%', md: `calc(100% - ${drawerWidth}px)` },
+          minWidth: 0,
+          height: '100dvh',
           display: 'flex',
           flexDirection: 'column',
           overflowX: 'hidden',
@@ -730,7 +744,7 @@ export default function DrawerAppBar(props: Props) {
               display: 'grid',
               gridTemplateColumns: {
                 xs: 'minmax(0, 1fr)',
-                sm: '1.2fr 0.8fr 0.8fr',
+                sm: 'repeat(2, minmax(0, 1fr))',
                 lg: 'minmax(280px, 1.5fr) minmax(170px, 0.75fr) minmax(140px, 0.65fr) minmax(260px, 1.1fr)',
               },
               gap: { xs: 1.25, sm: 1.5, md: 2 },

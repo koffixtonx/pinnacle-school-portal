@@ -49,7 +49,10 @@ create table if not exists auth.users (
   phone_change       text,
   phone_change_token text,
   is_sso_user        boolean not null default false,
-  deleted_at         timestamptz
+  deleted_at         timestamptz,
+  -- Nullable with no default, exactly as on hosted GoTrue: a row that leaves it
+  -- NULL cannot sign in, which is what the provisioning assertion pins down.
+  instance_id        uuid
 );
 
 -- identity_data drives the STORED generated `email` column exactly as it does in

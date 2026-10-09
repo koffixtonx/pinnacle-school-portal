@@ -183,7 +183,7 @@ const Fees: React.FC = () => {
       {loading && <CircularProgress sx={{ mb: 2 }} />}
 
       <Card>
-        <TableContainer>
+        <TableContainer sx={{ overflowX: 'auto' }}>
           <Table>
             <TableHead>
               <TableRow>

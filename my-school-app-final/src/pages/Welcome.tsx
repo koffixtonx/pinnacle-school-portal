@@ -85,16 +85,16 @@ const Welcome: React.FC = () => {
         <Box key={image} aria-hidden="true" sx={{ position: 'absolute', inset: 0, pointerEvents: 'none', backgroundImage: `url(${image})`, backgroundSize: 'cover', backgroundPosition: 'center', opacity: index === activeBackground ? 1 : 0, transition: 'opacity 1100ms ease-in-out' }} />
       ))}
       <Box aria-hidden="true" sx={{ position: 'absolute', inset: 0, pointerEvents: 'none', background: (theme) => theme.palette.mode === 'dark' ? 'linear-gradient(105deg, rgba(4,15,30,.94), rgba(4,15,30,.63))' : 'linear-gradient(105deg, rgba(4,26,53,.89), rgba(4,26,53,.50))' }} />
-      <Stack sx={{ position: 'relative', zIndex: 1, minHeight: { xs: 480, md: 620 }, p: { xs: 3, sm: 5, md: 7 }, justifyContent: 'space-between', alignItems: 'flex-start' }}>
+      <Stack spacing={{ xs: 3, md: 5 }} sx={{ position: 'relative', zIndex: 1, minHeight: { xs: 480, md: 620 }, p: { xs: 3, sm: 5, md: 7 }, justifyContent: 'center', alignItems: 'flex-start' }}>
         <Box>
           {loading && <Stack direction="row" spacing={1} sx={{ mb: 2, alignItems: 'center' }}><CircularProgress size={18} color="inherit" /><Typography variant="body2">Loading welcome settings…</Typography></Stack>}
           {loadError && <Alert severity="warning" sx={{ mb: 2, maxWidth: 600, bgcolor: 'rgba(255,255,255,.94)' }}>Welcome settings could not be loaded. Default content is being shown; check that the API is available.</Alert>}
           <Typography variant="overline" sx={{ letterSpacing: 2, fontWeight: 700, opacity: .9 }}>PINNACLE UNIVERSITY</Typography>
-          <Typography component="h1" variant="h2" sx={{ mt: 1, maxWidth: 760, fontWeight: 900, lineHeight: 1.06, color: message ? messageColor : 'common.white' }}>{displayedMessage}</Typography>
-          <Typography variant="h6" sx={{ mt: 2, maxWidth: 610, color: 'rgba(255,255,255,.9)', fontWeight: 400 }}>Your learning community, tools, and progress are all within reach.</Typography>
+          <Typography component="h1" variant="h2" sx={{ mt: 1, maxWidth: 760, fontSize: { xs: '1.9rem', sm: '2.6rem', md: '3.5rem' }, fontWeight: 900, lineHeight: 1.12, overflowWrap: 'anywhere', color: message ? messageColor : 'common.white' }}>{displayedMessage}</Typography>
+          <Typography variant="h6" sx={{ mt: 2, maxWidth: 610, fontSize: { xs: '1rem', md: '1.25rem' }, color: 'rgba(255,255,255,.9)', fontWeight: 400 }}>Your learning community, tools, and progress are all within reach.</Typography>
         </Box>
         <Stack direction={{ xs: 'column', sm: 'row' }} spacing={1.25} useFlexGap sx={{ flexWrap: 'wrap' }}>
-          {dashboardPath && <Button component={RouterLink} to={dashboardPath} variant="contained" color="secondary" size="large" startIcon={<DashboardIcon />} sx={{ color: 'primary.dark' }}>Open dashboard</Button>}
+          {dashboardPath && <Button component={RouterLink} to={dashboardPath} variant="contained" size="large" startIcon={<DashboardIcon />} sx={{ bgcolor: 'common.white', color: 'primary.dark', '&:hover': { bgcolor: 'rgba(255,255,255,.86)' } }}>Open dashboard</Button>}
           <Button component={RouterLink} to="/timetable" variant="outlined" size="large" startIcon={<EventNoteIcon />} sx={quickLinkSx}>Timetable</Button>
           {canAccessFees(currentUser?.role) && <Button component={RouterLink} to="/fees" variant="outlined" size="large" startIcon={<PaymentsIcon />} sx={quickLinkSx}>Fees</Button>}
           <Button component={RouterLink} to="/settings" variant="outlined" size="large" startIcon={<AccountCircleIcon />} sx={quickLinkSx}>Profile & settings</Button>

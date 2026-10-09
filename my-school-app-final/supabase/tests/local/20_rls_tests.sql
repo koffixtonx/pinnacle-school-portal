@@ -174,6 +174,16 @@ begin
      from auth.users where email = 'frank@example.com'$q$,
   'true');
 
+  -- Hosted GoTrue filters credential lookup by instance, so a NULL instance_id
+  -- signs in as invalid_credentials despite a hash that verifies in Postgres.
+  perform testhelp.allows(
+  'provisioned user is attached to the default auth instance',
+  null,
+  $q$select 1$q$,
+  $q$select coalesce(instance_id = '00000000-0000-0000-0000-000000000000'::uuid, false)
+     from auth.users where email = 'frank@example.com'$q$,
+  'true');
+
   perform testhelp.blocked(
   'a student cannot provision accounts',
   '00000000-0000-0000-0000-0000000000c0',

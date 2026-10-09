@@ -46,7 +46,7 @@ const Login: React.FC = () => {
 
   return (
     <Container maxWidth="sm">
-      <Box sx={{ display: 'flex', justifyContent: 'center', alignItems: 'center', minHeight: 'calc(100vh - 72px)', py: 4 }}>
+      <Box sx={{ display: 'flex', justifyContent: 'center', alignItems: 'center', minHeight: 'calc(100dvh - 72px)', py: 4 }}>
         <Card sx={{ width: '100%', boxShadow: 3 }}>
           <CardContent sx={{ p: 4 }}>
             <Typography variant="h4" sx={{ fontWeight: 700, mb: 1, textAlign: 'center' }}>

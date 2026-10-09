@@ -1,6 +1,7 @@
 import React from 'react';
 import { BrowserRouter, Routes, Route, Navigate } from "react-router-dom";
 import { ThemeProvider } from '@mui/material/styles';
+import { Box, CircularProgress } from '@mui/material';
 import { SpeedInsights } from '@vercel/speed-insights/react';
 import DrawerAppBar from "./components/DrawerAppBar";
 import getTheme from "./theme";
@@ -40,6 +41,14 @@ const ProtectedRoute: React.FC<{ children: React.ReactNode; roles?: Role[] }> = 
 
   return <>{children}</>;
 };
+
+function PageFallback() {
+  return (
+    <Box sx={{ minHeight: '50dvh', display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
+      <CircularProgress size={28} />
+    </Box>
+  );
+}
 
 function App() {
   const currentUser = useCurrentUser();
@@ -94,7 +103,7 @@ function App() {
       <BrowserRouter>
         {isAuthenticated ? (
           <DrawerAppBar mode={mode} onToggleColorMode={toggleColorMode}>
-            <React.Suspense fallback={<div>Loading page...</div>}>
+            <React.Suspense fallback={<PageFallback />}>
               <Routes>
               <Route path="/" element={<Welcome />} />
               <Route path="/login" element={<Navigate to="/" replace />} />
@@ -188,7 +197,7 @@ function App() {
             </React.Suspense>
           </DrawerAppBar>
         ) : (
-          <React.Suspense fallback={<div>Loading page...</div>}>
+          <React.Suspense fallback={<PageFallback />}>
             <Routes>
             <Route path="/" element={<Home />} />
             <Route path="/login" element={<Login />} />

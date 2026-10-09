@@ -109,7 +109,7 @@ const Home: React.FC = () => {
         elevation={0}
         sx={{
           position: 'relative',
-          minHeight: { xs: 560, md: 640 },
+          minHeight: { xs: 480, md: 560 },
           overflow: 'hidden',
           borderRadius: 1,
           color: 'common.white',
@@ -124,10 +124,11 @@ const Home: React.FC = () => {
           sx={{
             position: 'relative',
             zIndex: 1,
-            minHeight: { xs: 560, md: 640 },
+            minHeight: { xs: 480, md: 560 },
             display: 'flex',
             flexDirection: 'column',
-            justifyContent: 'space-between',
+            justifyContent: 'center',
+            gap: { xs: 3, md: 5 },
             p: { xs: 3, sm: 5, md: 7 },
           }}
         >
@@ -140,6 +141,10 @@ const Home: React.FC = () => {
               component="img"
               src={logoSrc || pinnacleLogo}
               alt="Pinnacle University"
+              onError={(event) => {
+                const el = event.currentTarget;
+                if (el.src !== pinnacleLogo) el.src = pinnacleLogo;
+              }}
               sx={{
                 width: { xs: 86, sm: 104 },
                 height: { xs: 86, sm: 104 },
@@ -160,21 +165,21 @@ const Home: React.FC = () => {
                   fontWeight: 700,
                 }}
               />
-              <Typography variant="h3" component="h1" sx={{ fontWeight: 900, lineHeight: 1.05, maxWidth: 720, letterSpacing: 0, color: welcomeMessage ? welcomeMessageColor : 'common.white' }}>
+              <Typography variant="h3" component="h1" sx={{ fontWeight: 900, lineHeight: 1.1, fontSize: { xs: '1.85rem', sm: '2.4rem', md: '3rem' }, maxWidth: 720, letterSpacing: 0, overflowWrap: 'anywhere', color: welcomeMessage ? welcomeMessageColor : 'common.white' }}>
                 {welcomeMessage || 'Welcome to Pinnacle University'}
               </Typography>
             </Box>
           </Stack>
 
           <Box sx={{ maxWidth: 720 }}>
-            <Typography variant="h4" component="h2" sx={{ fontWeight: 900, mb: 1, letterSpacing: 0 }}>
+            <Typography variant="h4" component="h2" sx={{ fontWeight: 900, mb: 1, letterSpacing: 0, fontSize: { xs: '1.4rem', md: '2.1rem' } }}>
               {currentSlide.title}
             </Typography>
             <Typography variant="h6" sx={{ color: 'rgba(255,255,255,0.86)', maxWidth: 640, mb: 3 }}>
               {currentSlide.caption}
             </Typography>
             <Stack direction={{ xs: 'column', sm: 'row' }} spacing={1.5}>
-              <Button component={RouterLink} to="/login" variant="contained" color="secondary" size="large" sx={{ color: '#08223c' }}>
+              <Button component={RouterLink} to="/login" variant="contained" size="large" sx={{ bgcolor: 'common.white', color: 'primary.dark', '&:hover': { bgcolor: 'rgba(255,255,255,.86)' } }}>
                 Get Started
               </Button>
               <Button
@@ -219,7 +224,7 @@ const Home: React.FC = () => {
       <Grid container spacing={3} sx={{ mt: 3 }}>
         {highlights.map((item) => (
           <Grid key={item.label}    size={{ xs: 12, sm: 6, md: 3 }}>
-            <Card sx={{ height: '100%', borderTop: '3px solid', borderColor: 'secondary.main' }}>
+            <Card sx={{ height: '100%', borderTop: '3px solid', borderTopColor: 'primary.main' }}>
               <CardContent sx={{ display: 'flex', alignItems: 'center', gap: 2 }}>
                 <Box
                   sx={{

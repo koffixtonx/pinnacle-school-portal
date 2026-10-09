@@ -129,18 +129,19 @@ const Teachers: React.FC = () => {
           size="small"
           value={search}
           onChange={(e) => setSearch(e.target.value)}
-          sx={{ minWidth: 300 }}
+          sx={{ width: { xs: '100%', sm: 320 }, minWidth: 0 }}
         />
       </Box>
 
       <Card>
-        <TableContainer>
+        <TableContainer sx={{ overflowX: 'auto' }}>
           <Table>
             <TableHead>
               <TableRow>
                 <TableCell sx={{ fontWeight: 600 }}>Name</TableCell>
-                <TableCell sx={{ fontWeight: 600 }}>Email</TableCell>
+                <TableCell sx={{ fontWeight: 600, display: { xs: 'none', sm: 'table-cell' } }}>Email</TableCell>
                 <TableCell sx={{ fontWeight: 600 }}>Status</TableCell>
+                <TableCell sx={{ fontWeight: 600 }}>Actions</TableCell>
               </TableRow>
             </TableHead>
             <TableBody>
@@ -154,20 +155,26 @@ const Teachers: React.FC = () => {
                       {teacher.firstName} {teacher.lastName}
                     </Box>
                   </TableCell>
-                  <TableCell>{teacher.email}</TableCell>
+                  <TableCell sx={{ display: { xs: 'none', sm: 'table-cell' } }}>{teacher.email}</TableCell>
                   <TableCell>
                     <Chip
                       label={teacher.active ? 'Active' : 'Inactive'}
                       size="small"
                       color={teacher.active ? 'success' : 'default'}
                       variant="outlined"
-                    />                    <Button size="small" onClick={() => handleEdit(teacher)} sx={{ ml: 1 }}>Edit</Button>                    <Button size="small" color="error" onClick={() => handleDelete(teacher.id)} sx={{ ml: 1 }}>Delete</Button>
+                    />
+                  </TableCell>
+                  <TableCell>
+                    <Box sx={{ display: 'flex', gap: 0.5, flexWrap: 'wrap' }}>
+                      <Button size="small" onClick={() => handleEdit(teacher)}>Edit</Button>
+                      <Button size="small" color="error" onClick={() => handleDelete(teacher.id)}>Delete</Button>
+                    </Box>
                   </TableCell>
                 </TableRow>
               ))}
               {filtered.length === 0 && !loading && (
                 <TableRow>
-                  <TableCell colSpan={3}>
+                  <TableCell colSpan={4}>
                     <Typography variant="body2" color="text.secondary">
                       No teachers found.
                     </Typography>

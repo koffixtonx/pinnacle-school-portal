@@ -179,7 +179,7 @@ const Attendance: React.FC = () => {
           </Box>
 
           {roster.length > 0 && (
-            <TableContainer>
+            <TableContainer sx={{ overflowX: 'auto' }}>
               <Table size="small">
                 <TableHead>
                   <TableRow>
@@ -218,7 +218,7 @@ const Attendance: React.FC = () => {
       {loading && <CircularProgress sx={{ mb: 2 }} />}
 
       <Card>
-        <TableContainer>
+        <TableContainer sx={{ overflowX: 'auto' }}>
           <Table>
             <TableHead>
               <TableRow>

@@ -143,7 +143,7 @@ const Students: React.FC = () => {
           size="small"
           value={search}
           onChange={(e) => setSearch(e.target.value)}
-          sx={{ minWidth: 300 }}
+          sx={{ width: { xs: '100%', sm: 320 }, minWidth: 0 }}
         />
         <Box component="span" sx={{ ml: 2 }}>
           {canCreateStudents && <Button variant="contained" onClick={() => setDialogOpen(true)}>New Student</Button>}
@@ -151,16 +151,16 @@ const Students: React.FC = () => {
       </Box>
 
       <Card>
-        <TableContainer>
+        <TableContainer sx={{ overflowX: 'auto' }}>
           <Table>
             <TableHead>
               <TableRow>
                 <TableCell sx={{ fontWeight: 600 }}>Name</TableCell>
-                <TableCell sx={{ fontWeight: 600 }}>Email</TableCell>
+                <TableCell sx={{ fontWeight: 600, display: { xs: 'none', sm: 'table-cell' } }}>Email</TableCell>
                 <TableCell sx={{ fontWeight: 600 }}>Status</TableCell>
-                <TableCell sx={{ fontWeight: 600 }}>Level</TableCell>
-                <TableCell sx={{ fontWeight: 600 }}>Admitted</TableCell>
-                <TableCell sx={{ fontWeight: 600 }}>Joined</TableCell>
+                <TableCell sx={{ fontWeight: 600, display: { xs: 'none', sm: 'table-cell' } }}>Level</TableCell>
+                <TableCell sx={{ fontWeight: 600, display: { xs: 'none', sm: 'table-cell' } }}>Admitted</TableCell>
+                <TableCell sx={{ fontWeight: 600, display: { xs: 'none', sm: 'table-cell' } }}>Joined</TableCell>
                 <TableCell sx={{ fontWeight: 600 }}>Actions</TableCell>
               </TableRow>
             </TableHead>
@@ -175,7 +175,7 @@ const Students: React.FC = () => {
                       {student.firstName} {student.lastName}
                     </Box>
                   </TableCell>
-                  <TableCell>{student.email}</TableCell>
+                  <TableCell sx={{ display: { xs: 'none', sm: 'table-cell' } }}>{student.email}</TableCell>
                   <TableCell>
                     <Chip
                       label={student.studentStatus === 'ON_PROBATION' ? 'On Probation' : student.studentStatus === 'INACTIVE' ? 'Inactive' : 'Active'}
@@ -184,9 +184,9 @@ const Students: React.FC = () => {
                       variant="outlined"
                     />
                   </TableCell>
-                  <TableCell>{student.studentLevel ? `${student.studentLevel} Level` : '100 Level'}</TableCell>
-                  <TableCell>{student.admittedYear ?? '—'}</TableCell>
-                  <TableCell>{new Date(student.createdAt).toLocaleDateString()}</TableCell>
+                  <TableCell sx={{ display: { xs: 'none', sm: 'table-cell' } }}>{student.studentLevel ? `${student.studentLevel} Level` : '100 Level'}</TableCell>
+                  <TableCell sx={{ display: { xs: 'none', sm: 'table-cell' } }}>{student.admittedYear ?? '—'}</TableCell>
+                  <TableCell sx={{ display: { xs: 'none', sm: 'table-cell' } }}>{new Date(student.createdAt).toLocaleDateString()}</TableCell>
                   <TableCell>
                     {canManageStudents && <Button size="small" onClick={() => handleEdit(student)}>Edit</Button>}
                     {canCreateStudents && <Button size="small" color="error" onClick={() => handleDelete(student.id)}>Delete</Button>}
