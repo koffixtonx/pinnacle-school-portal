@@ -761,7 +761,7 @@ export const attendanceService = {
   async list(params?: { classSectionId?: string; date?: string }) {
     let query = supabase
       .from('attendance_records')
-      .select('id, status, recorded_at, notes, student:profiles(id, first_name, last_name), classSection:class_sections(id, name)')
+      .select('id, status, recorded_at, notes, student:profiles!attendance_records_student_id_fkey(id, first_name, last_name), classSection:class_sections(id, name)')
       .order('recorded_at', { ascending: false })
       .limit(200);
     if (params?.classSectionId) query = query.eq('class_section_id', params.classSectionId);
@@ -895,7 +895,7 @@ export const feesService = {
   async listInvoices(studentId?: string) {
     let query = supabase
       .from('invoices')
-      .select('id, reference, status, due_date, total_amount, paid_amount, created_at, lines:invoice_lines(id, description, amount), payments(*), student:profiles(id, first_name, last_name, email)')
+      .select('id, reference, status, due_date, total_amount, paid_amount, created_at, lines:invoice_lines(id, description, amount), payments(*), student:profiles!invoices_student_id_fkey(id, first_name, last_name, email)')
       .order('created_at', { ascending: false })
       .limit(200);
     if (studentId) query = query.eq('student_id', studentId);

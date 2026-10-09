@@ -68,8 +68,9 @@ export const fullName = (row?: Row | null) =>
 export const person = (row?: Row | null) =>
   row ? { id: row.id, firstName: row.first_name, lastName: row.last_name } : null;
 
+/** Same `{ data: ... }` nesting the axios responses had, so pages read `res.data.data`. */
 export function paged<T>(data: T, nextCursor: string | null) {
-  return { data, paging: { nextCursor } };
+  return { data: { data, paging: { nextCursor } } };
 }
 
 /**

@@ -433,14 +433,15 @@ begin
     now(), now(), '', '', '', '', '', null, '', '', false, null
   );
 
-  -- auth.identities.email is a STORED generated column over identity_data->>'email',
-  -- so it must not appear in the column list.
+  -- auth.identities has no `status` column on hosted GoTrue, and its email
+  -- column is a STORED generated column over identity_data->>'email', so
+  -- neither may appear in the column list.
   insert into auth.identities (
-    id, user_id, provider_id, provider, identity_data, status, last_sign_in_at, created_at, updated_at
+    id, user_id, provider_id, provider, identity_data, last_sign_in_at, created_at, updated_at
   ) values (
     gen_random_uuid(), v_user_id, v_user_id::text, 'email',
     jsonb_build_object('sub', v_user_id::text, 'email', v_email, 'email_verified', true),
-    'linked', now(), now(), now()
+    now(), now(), now()
   );
 
   update public.profiles
@@ -451,7 +452,9 @@ begin
 end;
 $$;
 
-revoke execute on function public.create_school_user(text, text, text, text, text) from public;
+-- Supabase's default privileges hand EXECUTE to anon directly, so revoking from
+-- `public` alone still leaves the RPC callable by the anon key.
+revoke execute on function public.create_school_user(text, text, text, text, text) from public, anon;
 grant execute on function public.create_school_user(text, text, text, text, text) to authenticated;
 
 ---------------------------------------------------------------------------

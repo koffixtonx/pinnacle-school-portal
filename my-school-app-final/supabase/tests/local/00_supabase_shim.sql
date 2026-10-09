@@ -64,7 +64,6 @@ create table if not exists auth.identities (
   created_at      timestamptz default now(),
   updated_at      timestamptz default now(),
   email           text generated always as (lower(identity_data ->> 'email')) stored,
-  status          text,
   unique (provider, provider_id)
 );
 
