@@ -83,7 +83,7 @@ const Welcome: React.FC = () => {
       {backgrounds.map((image, index) => (
         <Box key={image} aria-hidden="true" sx={{ position: 'absolute', inset: 0, pointerEvents: 'none', backgroundImage: `url("${image}")`, backgroundSize: 'cover', backgroundPosition: 'center', opacity: index === activeBackground ? 1 : 0, transition: 'opacity 1100ms ease-in-out' }} />
       ))}
-      <Box aria-hidden="true" sx={{ position: 'absolute', inset: 0, pointerEvents: 'none', background: (theme) => theme.palette.mode === 'dark' ? 'linear-gradient(105deg, rgba(4,15,30,.94), rgba(4,15,30,.63))' : 'linear-gradient(105deg, rgba(4,26,53,.89), rgba(4,26,53,.50))' }} />
+      <Box aria-hidden="true" sx={{ position: 'absolute', inset: 0, pointerEvents: 'none', background: (theme) => theme.palette.mode === 'dark' ? 'linear-gradient(105deg, rgba(4,15,30,.94), rgba(4,15,30,.55))' : 'linear-gradient(105deg, rgba(4,26,53,.89), rgba(4,26,53,.50))' }} />
       <Stack spacing={{ xs: 3, md: 5 }} sx={{ position: 'relative', zIndex: 1, minHeight: { xs: 480, md: 620 }, p: { xs: 3, sm: 5, md: 7 }, justifyContent: 'center', alignItems: 'flex-start' }}>
         <Box>
           {loading && <Stack direction="row" spacing={1} sx={{ mb: 2, alignItems: 'center' }}><CircularProgress size={18} color="inherit" /><Typography variant="body2">Loading welcome settings…</Typography></Stack>}
