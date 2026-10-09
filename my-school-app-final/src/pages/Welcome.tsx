@@ -8,14 +8,13 @@ import { Link as RouterLink } from 'react-router-dom';
 import { siteSettingsService } from '../services/api.service';
 import { useCurrentUser } from '../hooks/useCurrentUser';
 import { resolveAssetUrl } from '../services/api';
+import heroCampus from '../assets/hero-campus.svg';
+import heroHall from '../assets/hero-hall.svg';
+import heroLibrary from '../assets/hero-library.svg';
 
-// These are only used until an administrator adds welcome backgrounds in
+// Placeholder art used until an administrator adds welcome backgrounds in
 // Site Customization.  Tenant-provided images always take precedence.
-const fallbackBackgrounds = [
-  'https://images.unsplash.com/photo-1523050854058-8df90110c9f1?auto=format&fit=crop&w=1800&q=85',
-  'https://images.unsplash.com/photo-1509062522246-3755977927d7?auto=format&fit=crop&w=1800&q=85',
-  'https://images.unsplash.com/photo-1524995997946-a1c2e315a42f?auto=format&fit=crop&w=1800&q=85',
-];
+const fallbackBackgrounds = [heroCampus, heroHall, heroLibrary];
 
 const getDashboardPath = (role?: string) => {
   if (role === 'SUPER_ADMIN' || role === 'SCHOOL_ADMIN') return '/dashboard';
@@ -82,7 +81,7 @@ const Welcome: React.FC = () => {
       sx={{ position: 'relative', minHeight: { xs: 480, md: 620 }, overflow: 'hidden', borderRadius: 2, bgcolor: 'primary.dark', color: 'common.white' }}
     >
       {backgrounds.map((image, index) => (
-        <Box key={image} aria-hidden="true" sx={{ position: 'absolute', inset: 0, pointerEvents: 'none', backgroundImage: `url(${image})`, backgroundSize: 'cover', backgroundPosition: 'center', opacity: index === activeBackground ? 1 : 0, transition: 'opacity 1100ms ease-in-out' }} />
+        <Box key={image} aria-hidden="true" sx={{ position: 'absolute', inset: 0, pointerEvents: 'none', backgroundImage: `url("${image}")`, backgroundSize: 'cover', backgroundPosition: 'center', opacity: index === activeBackground ? 1 : 0, transition: 'opacity 1100ms ease-in-out' }} />
       ))}
       <Box aria-hidden="true" sx={{ position: 'absolute', inset: 0, pointerEvents: 'none', background: (theme) => theme.palette.mode === 'dark' ? 'linear-gradient(105deg, rgba(4,15,30,.94), rgba(4,15,30,.63))' : 'linear-gradient(105deg, rgba(4,26,53,.89), rgba(4,26,53,.50))' }} />
       <Stack spacing={{ xs: 3, md: 5 }} sx={{ position: 'relative', zIndex: 1, minHeight: { xs: 480, md: 620 }, p: { xs: 3, sm: 5, md: 7 }, justifyContent: 'center', alignItems: 'flex-start' }}>

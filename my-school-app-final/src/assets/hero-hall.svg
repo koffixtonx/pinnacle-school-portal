@@ -1,0 +1,114 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 1600 900" preserveAspectRatio="xMidYMid slice" role="img" aria-label="Stylised lecture hall interior">
+  <defs>
+    <linearGradient id="wall" x1="0" y1="0" x2="0" y2="1">
+      <stop offset="0" stop-color="#03121f"/>
+      <stop offset=".55" stop-color="#113a5f"/>
+      <stop offset="1" stop-color="#2c6795"/>
+    </linearGradient>
+    <linearGradient id="dusk" x1="0" y1="0" x2="0" y2="1">
+      <stop offset="0" stop-color="#a8d3f2"/>
+      <stop offset=".5" stop-color="#f6dc9b"/>
+      <stop offset="1" stop-color="#ffe9ad"/>
+    </linearGradient>
+    <linearGradient id="beam" x1="0" y1="0" x2="0" y2="1">
+      <stop offset="0" stop-color="#ffe9ad" stop-opacity=".85"/>
+      <stop offset="1" stop-color="#ffe9ad" stop-opacity="0"/>
+    </linearGradient>
+    <linearGradient id="floor" x1="0" y1="0" x2="0" y2="1">
+      <stop offset="0" stop-color="#0a2b47"/>
+      <stop offset="1" stop-color="#02101f"/>
+    </linearGradient>
+    <radialGradient id="pool" cx=".5" cy=".5" r=".5">
+      <stop offset="0" stop-color="#ffe9ad" stop-opacity=".3"/>
+      <stop offset="1" stop-color="#ffe9ad" stop-opacity="0"/>
+    </radialGradient>
+  </defs>
+
+  <rect width="1600" height="900" fill="url(#wall)"/>
+
+  <!-- tall windows, glowing with dusk light -->
+  <g>
+    <rect x="1000" y="70" width="150" height="430" rx="6" fill="url(#dusk)"/>
+    <rect x="1200" y="70" width="150" height="430" rx="6" fill="url(#dusk)"/>
+    <rect x="1400" y="70" width="150" height="430" rx="6" fill="url(#dusk)"/>
+    <g fill="#02101f">
+      <rect x="984" y="56" width="16" height="460"/>
+      <rect x="1150" y="56" width="50" height="460"/>
+      <rect x="1350" y="56" width="50" height="460"/>
+      <rect x="1550" y="56" width="16" height="460"/>
+      <rect x="1000" y="270" width="150" height="10"/>
+      <rect x="1200" y="270" width="150" height="10"/>
+      <rect x="1400" y="270" width="150" height="10"/>
+    </g>
+  </g>
+
+  <!-- light spilling from the windows onto the floor -->
+  <g>
+    <polygon points="1000,500 1150,500 1290,700 1090,700" fill="url(#beam)" opacity=".26"/>
+    <polygon points="1200,500 1350,500 1520,700 1320,700" fill="url(#beam)" opacity=".18"/>
+  </g>
+
+  <!-- projection screen -->
+  <g>
+    <rect x="150" y="130" width="560" height="330" rx="10" fill="#06203a" stroke="#a8d3f2" stroke-width="6"/>
+    <rect x="176" y="156" width="508" height="278" fill="#123f66"/>
+    <g stroke="#ffe9ad" stroke-width="10" stroke-linecap="round">
+      <path d="M216 220h300"/>
+      <path d="M216 285h200"/>
+      <path d="M216 350h250"/>
+    </g>
+    <circle cx="606" cy="362" r="34" fill="#a8d3f2" opacity=".8"/>
+    <rect x="418" y="90" width="24" height="40" fill="#02101f"/>
+  </g>
+
+  <!-- ceiling downlights -->
+  <g fill="#ffe9ad">
+    <ellipse cx="360" cy="60" rx="80" ry="16" opacity=".75"/>
+    <ellipse cx="760" cy="60" rx="80" ry="16" opacity=".75"/>
+  </g>
+
+  <rect y="520" width="1600" height="380" fill="url(#floor)"/>
+  <rect y="514" width="1600" height="10" fill="#a8d3f2" opacity=".4"/>
+
+  <!-- stepped desks -->
+  <g fill="#052135">
+    <rect y="596" width="1600" height="46" opacity=".95"/>
+    <rect y="694" width="1600" height="52"/>
+    <rect y="800" width="1600" height="60"/>
+  </g>
+  <g fill="#a8d3f2" opacity=".28">
+    <rect y="596" width="1600" height="6"/>
+    <rect y="694" width="1600" height="6"/>
+    <rect y="800" width="1600" height="6"/>
+  </g>
+
+  <!-- seats -->
+  <g fill="#010d19">
+    <g id="seat">
+      <rect x="0" y="-52" width="92" height="52" rx="10"/>
+      <rect x="12" y="-108" width="68" height="58" rx="16"/>
+    </g>
+    <use href="#seat" x="70" y="694"/>
+    <use href="#seat" x="235" y="694"/>
+    <use href="#seat" x="400" y="694"/>
+    <use href="#seat" x="565" y="694"/>
+    <use href="#seat" x="730" y="694"/>
+    <use href="#seat" x="895" y="694"/>
+    <use href="#seat" x="1060" y="694"/>
+    <use href="#seat" x="1225" y="694"/>
+    <use href="#seat" x="1390" y="694"/>
+    <use href="#seat" x="110" y="800"/>
+    <use href="#seat" x="300" y="800"/>
+    <use href="#seat" x="490" y="800"/>
+    <use href="#seat" x="680" y="800"/>
+    <use href="#seat" x="870" y="800"/>
+    <use href="#seat" x="1060" y="800"/>
+    <use href="#seat" x="1250" y="800"/>
+    <use href="#seat" x="1440" y="800"/>
+  </g>
+
+  <g>
+    <ellipse cx="1290" cy="640" rx="260" ry="60" fill="url(#pool)"/>
+    <ellipse cx="840" cy="580" rx="240" ry="50" fill="url(#pool)" opacity=".7"/>
+  </g>
+</svg>

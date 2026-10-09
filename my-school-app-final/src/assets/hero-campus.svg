@@ -1,0 +1,80 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 1600 900" preserveAspectRatio="xMidYMid slice" role="img" aria-label="Stylised university campus skyline at dusk">
+  <defs>
+    <linearGradient id="sky" x1="0" y1="0" x2="0" y2="1">
+      <stop offset="0" stop-color="#06172b"/>
+      <stop offset=".38" stop-color="#164069"/>
+      <stop offset=".70" stop-color="#4b87bd"/>
+      <stop offset="1" stop-color="#9cc9ea"/>
+    </linearGradient>
+    <radialGradient id="sun" cx=".74" cy=".70" r=".40">
+      <stop offset="0" stop-color="#ffe9ad" stop-opacity=".9"/>
+      <stop offset=".35" stop-color="#f7cf72" stop-opacity=".45"/>
+      <stop offset="1" stop-color="#f7cf72" stop-opacity="0"/>
+    </radialGradient>
+    <linearGradient id="block" x1="0" y1="0" x2="0" y2="1">
+      <stop offset="0" stop-color="#06203a"/>
+      <stop offset="1" stop-color="#02101f"/>
+    </linearGradient>
+    <linearGradient id="ground" x1="0" y1="0" x2="0" y2="1">
+      <stop offset="0" stop-color="#0b2b47"/>
+      <stop offset="1" stop-color="#04121f"/>
+    </linearGradient>
+    <pattern id="glass" width="46" height="62" patternUnits="userSpaceOnUse">
+      <rect width="24" height="32" x="9" y="14" fill="#ffd77a" opacity=".55"/>
+    </pattern>
+    <pattern id="glassLit" width="46" height="62" patternUnits="userSpaceOnUse">
+      <rect width="24" height="32" x="9" y="14" fill="#ffe9ad" opacity=".9"/>
+    </pattern>
+  </defs>
+
+  <rect width="1600" height="900" fill="url(#sky)"/>
+  <rect width="1600" height="900" fill="url(#sun)"/>
+
+  <g opacity=".45" fill="#0a2b49">
+    <path d="M0 470h190v-70h120v70h220v-96h150v96h920v340H0z"/>
+  </g>
+
+  <g>
+    <rect x="120" y="360" width="230" height="330" fill="url(#block)"/>
+    <rect x="120" y="360" width="230" height="330" fill="url(#glass)"/>
+
+    <rect x="400" y="250" width="180" height="440" fill="url(#block)"/>
+    <rect x="400" y="250" width="180" height="440" fill="url(#glassLit)"/>
+    <path d="M490 172 626 250H354z" fill="#0f3355"/>
+    <path d="M490 172v78" stroke="#ffd77a" stroke-opacity=".45" stroke-width="5"/>
+
+    <rect x="640" y="390" width="300" height="300" fill="url(#block)"/>
+    <rect x="640" y="390" width="300" height="300" fill="url(#glass)"/>
+
+    <rect x="990" y="300" width="150" height="390" fill="url(#block)"/>
+    <rect x="990" y="300" width="150" height="390" fill="url(#glassLit)"/>
+
+    <rect x="1180" y="420" width="320" height="270" fill="url(#block)"/>
+    <rect x="1180" y="420" width="320" height="270" fill="url(#glass)"/>
+
+    <rect x="1500" y="340" width="120" height="350" fill="url(#block)"/>
+    <rect x="1500" y="340" width="120" height="350" fill="url(#glassLit)"/>
+
+    <g fill="#02101f">
+      <rect x="640" y="470" width="300" height="14"/>
+      <rect x="1180" y="500" width="320" height="14"/>
+    </g>
+  </g>
+
+  <rect y="690" width="1600" height="210" fill="url(#ground)"/>
+  <rect y="690" width="1600" height="6" fill="#a8d3f2" opacity=".45"/>
+
+  <g fill="#03121f">
+    <path d="M210 690c-46-26-70-74-52-118 34 10 62 40 70 74l10-96h18l10 96c8-34 36-64 70-74 18 44-6 92-52 118z"/>
+    <path d="M1330 706c-40-22-62-64-46-104 30 9 55 35 62 65l9-84h16l9 84c7-30 32-56 62-65 16 40-6 82-46 104z"/>
+    <path d="M880 690c-34-19-52-55-39-88 26 7 46 30 52 55l8-71h13l8 71c6-25 26-48 52-55 13 33-5 69-39 88z"/>
+  </g>
+
+  <g fill="#ffe9ad">
+    <circle cx="1420" cy="150" r="4"/>
+    <circle cx="1290" cy="228" r="3"/>
+    <circle cx="1520" cy="270" r="3.5"/>
+    <circle cx="1180" cy="118" r="2.5"/>
+    <circle cx="1050" cy="196" r="2.5"/>
+  </g>
+</svg>

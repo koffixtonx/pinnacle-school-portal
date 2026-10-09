@@ -19,6 +19,9 @@ import GroupsIcon from '@mui/icons-material/Groups';
 import MenuBookIcon from '@mui/icons-material/MenuBook';
 import EventNoteIcon from '@mui/icons-material/EventNote';
 import pinnacleLogo from '../assets/pinnacle-logo.png';
+import heroCampus from '../assets/hero-campus.svg';
+import heroHall from '../assets/hero-hall.svg';
+import heroLibrary from '../assets/hero-library.svg';
 import { siteSettingsService } from '../services/api.service';
 import { resolveAssetUrl } from '../services/api';
 
@@ -26,17 +29,17 @@ const slides = [
   {
     title: 'A Campus Built For Ambition',
     caption: 'Modern learning spaces, active student life, and a culture of achievement.',
-    image: 'https://images.unsplash.com/photo-1523050854058-8df90110c9f1?auto=format&fit=crop&w=1400&q=80',
+    image: heroCampus,
   },
   {
     title: 'Learning That Feels Alive',
     caption: 'Practical classes, engaged teachers, and programs shaped around real progress.',
-    image: 'https://images.unsplash.com/photo-1509062522246-3755977927d7?auto=format&fit=crop&w=1400&q=80',
+    image: heroHall,
   },
   {
     title: 'Resources For Every Peak',
     caption: 'Libraries, labs, schedules, and support systems working together for students.',
-    image: 'https://images.unsplash.com/photo-1524995997946-a1c2e315a42f?auto=format&fit=crop&w=1400&q=80',
+    image: heroLibrary,
   },
 ];
 
@@ -95,13 +98,19 @@ const Home: React.FC = () => {
     [welcomeBackgrounds],
   );
 
+  // Without tenant images the hero shows each slide's own artwork, so the picture
+  // and its caption advance together on the slide timer.
+  const hasCustomBackgrounds = resolvedBackgrounds.length > 0;
+  const heroBackgrounds = hasCustomBackgrounds ? resolvedBackgrounds : slides.map((slide) => slide.image);
+  const heroIndex = hasCustomBackgrounds ? activeBackground : activeSlide;
+
   React.useEffect(() => {
-    if (resolvedBackgrounds.length < 2) return undefined;
+    if (!hasCustomBackgrounds || resolvedBackgrounds.length < 2) return undefined;
     const nextImage = new Image();
     nextImage.src = resolvedBackgrounds[(activeBackground + 1) % resolvedBackgrounds.length];
     const timer = window.setInterval(() => setActiveBackground((current) => (current + 1) % resolvedBackgrounds.length), 6000);
     return () => window.clearInterval(timer);
-  }, [activeBackground, resolvedBackgrounds]);
+  }, [activeBackground, hasCustomBackgrounds, resolvedBackgrounds]);
 
   return (
     <Box sx={{ pb: 5 }}>
@@ -118,8 +127,8 @@ const Home: React.FC = () => {
           bgcolor: '#08223c',
         }}
       >
-        {resolvedBackgrounds.map((image, index) => <Box key={image} sx={{ position: 'absolute', inset: 0, backgroundImage: `url(${image})`, backgroundPosition: 'center', backgroundSize: 'cover', opacity: index === activeBackground ? 1 : 0, transition: 'opacity 1100ms ease-in-out' }} />)}
-        <Box sx={{ position: 'absolute', inset: 0, background: 'linear-gradient(90deg, rgba(8, 34, 60, 0.92), rgba(18, 53, 91, 0.64) 54%, rgba(8, 34, 60, 0.3))' }} />
+        {heroBackgrounds.map((image, index) => <Box key={image} aria-hidden="true" sx={{ position: 'absolute', inset: 0, pointerEvents: 'none', backgroundImage: `url("${image}")`, backgroundPosition: 'center', backgroundSize: 'cover', opacity: index === heroIndex ? 1 : 0, transition: 'opacity 1100ms ease-in-out' }} />)}
+        <Box aria-hidden="true" sx={{ position: 'absolute', inset: 0, pointerEvents: 'none', background: 'linear-gradient(90deg, rgba(8, 34, 60, 0.9), rgba(18, 53, 91, 0.6) 54%, rgba(8, 34, 60, 0.24))' }} />
         <Box
           sx={{
             position: 'relative',
