@@ -41,13 +41,23 @@ interface GradeEntry {
   id: string;
   score: number;
   letterGrade: string;
+  status?: string;
   gradePeriod: { id: string; name: string; courseId: string };
   enrollment: { id: string; studentId: string };
 }
 
+const STATUS_ORDER = ['DRAFT', 'SUBMITTED', 'APPROVED', 'PUBLISHED'] as const;
+const STATUS_TONE: Record<string, 'default' | 'info' | 'warning' | 'success'> = {
+  DRAFT: 'default',
+  SUBMITTED: 'info',
+  APPROVED: 'warning',
+  PUBLISHED: 'success',
+};
+
 const Grades: React.FC = () => {
   const user = useCurrentUser();
   const canEnter = user?.role === 'TEACHER' || user?.role === 'SUPER_ADMIN' || user?.role === 'SCHOOL_ADMIN';
+  const isAdmin = user?.role === 'SUPER_ADMIN' || user?.role === 'SCHOOL_ADMIN';
 
   const [courses, setCourses] = React.useState<Course[]>([]);
   const [selectedCourse, setSelectedCourse] = React.useState('');
@@ -141,6 +151,49 @@ const Grades: React.FC = () => {
 
   const entryFor = (enrollmentId: string) => entries.find((entry) => entry.enrollment.id === enrollmentId);
 
+  const periodEntries = selectedPeriod
+    ? entries.filter((entry) => entry.gradePeriod.id === selectedPeriod)
+    : entries;
+  const statusCounts = gradesService.countByStatus(periodEntries);
+  const bookStatus =
+    [...STATUS_ORDER].reverse().find((status) => (statusCounts[status] ?? 0) > 0) ?? 'DRAFT';
+  // A teacher's grade book freezes once it leaves draft; administrators can keep
+  // editing because only they can approve, publish or reopen it.
+  const canEditScores = !selectedPeriod || isAdmin || bookStatus === 'DRAFT';
+  // A submitted book goes back to the teacher through review; once it has been
+  // approved or published only a reopen clears the whole trail of stamps.
+  const reopenAction = (statusCounts.SUBMITTED ?? 0) > 0 ? 'reject' : 'reopen';
+
+  const runWorkflow = async (action: 'submit' | 'approve' | 'reject' | 'publish' | 'reopen') => {
+    if (!selectedPeriod) return;
+    try {
+      setLoading(true);
+      setError('');
+      if (action === 'submit') {
+        const res = await gradesService.submitPeriod(selectedPeriod);
+        showSuccess(`${res.data.data.submitted} grade${res.data.data.submitted === 1 ? '' : 's'} submitted for review.`);
+      } else if (action === 'publish') {
+        const res = await gradesService.publishPeriod(selectedPeriod);
+        showSuccess(`${res.data.data.published} grade${res.data.data.published === 1 ? '' : 's'} published to students.`);
+      } else if (action === 'reopen') {
+        const res = await gradesService.reopenPeriod(selectedPeriod);
+        showSuccess(`${res.data.data.reopened} grade${res.data.data.reopened === 1 ? '' : 's'} returned to draft.`);
+      } else {
+        const res = await gradesService.reviewPeriod(selectedPeriod, action === 'approve');
+        showSuccess(
+          action === 'approve'
+            ? `${res.data.data.reviewed} grade${res.data.data.reviewed === 1 ? '' : 's'} approved.`
+            : `${res.data.data.reviewed} grade${res.data.data.reviewed === 1 ? '' : 's'} returned to draft.`
+        );
+      }
+      await fetchEntries();
+    } catch (err: any) {
+      setError(err.response?.data?.message || 'That step could not be completed.');
+    } finally {
+      setLoading(false);
+    }
+  };
+
   return (
     <Box>
       <Box sx={{ mb: 3 }}>
@@ -190,6 +243,59 @@ const Grades: React.FC = () => {
             </Button>
           </Box>
 
+          {selectedPeriod && (
+            <Box
+              sx={{
+                mt: 2,
+                p: 1.5,
+                borderRadius: 2,
+                border: '1px solid',
+                borderColor: 'divider',
+                display: 'flex',
+                gap: 1,
+                flexWrap: 'wrap',
+                alignItems: 'center',
+              }}
+            >
+              <Typography variant="body2" sx={{ fontWeight: 700 }}>
+                {bookStatus}
+              </Typography>
+              {STATUS_ORDER.map((status) => (
+                <Chip
+                  key={status}
+                  size="small"
+                  variant="outlined"
+                  color={STATUS_TONE[status]}
+                  label={`${status}: ${statusCounts[status] ?? 0}`}
+                />
+              ))}
+              <Box sx={{ flexGrow: 1 }} />
+              <Button size="small" variant="outlined" onClick={() => runWorkflow('submit')} disabled={!canEnter || bookStatus !== 'DRAFT' || periodEntries.length === 0}>
+                Submit to school
+              </Button>
+              {isAdmin && (
+                <>
+                  <Button size="small" variant="outlined" onClick={() => runWorkflow('approve')} disabled={(statusCounts.SUBMITTED ?? 0) === 0}>
+                    Approve
+                  </Button>
+                  <Button size="small" variant="outlined" color="error" onClick={() => runWorkflow(reopenAction)} disabled={bookStatus === 'DRAFT'}>
+                    Return to draft
+                  </Button>
+                  <Button size="small" variant="contained" onClick={() => runWorkflow('publish')} disabled={(statusCounts.APPROVED ?? 0) === 0}>
+                    Publish to students
+                  </Button>
+                </>
+              )}
+            </Box>
+          )}
+
+          {selectedPeriod && !canEditScores && (
+            <Alert severity="info" sx={{ mt: 2 }}>
+              These results are {bookStatus.toLowerCase()} and can no longer be changed by a teacher. An
+              administrator can return the grade book to draft.
+            </Alert>
+          )}
+
           {selectedCourse && selectedPeriod && enrollments.length > 0 && (
             <TableContainer sx={{ mt: 2, overflowX: 'auto' }}>
               <Table size="small">
@@ -197,6 +303,7 @@ const Grades: React.FC = () => {
                   <TableRow>
                     <TableCell>Student</TableCell>
                     <TableCell>Current</TableCell>
+                    <TableCell>Status</TableCell>
                     <TableCell>New Score</TableCell>
                     <TableCell />
                   </TableRow>
@@ -213,17 +320,26 @@ const Grades: React.FC = () => {
                           {existing ? <Chip label={`${existing.score} (${existing.letterGrade})`} size="small" /> : '—'}
                         </TableCell>
                         <TableCell>
+                          <Chip
+                            size="small"
+                            variant="outlined"
+                            color={STATUS_TONE[existing?.status ?? 'DRAFT']}
+                            label={existing?.status ?? 'DRAFT'}
+                          />
+                        </TableCell>
+                        <TableCell>
                           <TextField
                             size="small"
                             type="number"
                             placeholder="0-100"
+                            disabled={!canEditScores}
                             value={scores[enrollment.id] ?? ''}
                             onChange={(e) => setScores({ ...scores, [enrollment.id]: e.target.value })}
                             sx={{ width: 100 }}
                           />
                         </TableCell>
                         <TableCell>
-                          <Button size="small" onClick={() => handleSaveScore(enrollment.id)}>
+                          <Button size="small" onClick={() => handleSaveScore(enrollment.id)} disabled={!canEditScores}>
                             Save
                           </Button>
                         </TableCell>
@@ -247,6 +363,7 @@ const Grades: React.FC = () => {
                 <TableCell sx={{ fontWeight: 600 }}>Grade Period</TableCell>
                 <TableCell sx={{ fontWeight: 600 }}>Score</TableCell>
                 <TableCell sx={{ fontWeight: 600 }}>Letter Grade</TableCell>
+                <TableCell sx={{ fontWeight: 600 }}>Status</TableCell>
               </TableRow>
             </TableHead>
             <TableBody>
@@ -257,11 +374,19 @@ const Grades: React.FC = () => {
                   <TableCell>
                     <Chip label={entry.letterGrade} size="small" />
                   </TableCell>
+                  <TableCell>
+                    <Chip
+                      size="small"
+                      variant="outlined"
+                      color={STATUS_TONE[entry.status ?? 'DRAFT']}
+                      label={entry.status ?? 'DRAFT'}
+                    />
+                  </TableCell>
                 </TableRow>
               ))}
               {entries.length === 0 && !loading && (
                 <TableRow>
-                  <TableCell colSpan={3}>
+                  <TableCell colSpan={4}>
                     <Typography variant="body2" color="text.secondary">
                       No grades recorded yet.
                     </Typography>

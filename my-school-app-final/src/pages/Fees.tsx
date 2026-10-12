@@ -1,7 +1,9 @@
 import React from 'react';
+import { useSearchParams } from 'react-router-dom';
 import {
   Box,
   Card,
+  CardContent,
   Table,
   TableBody,
   TableCell,
@@ -24,7 +26,10 @@ import {
 import AddIcon from '@mui/icons-material/Add';
 import PaymentIcon from '@mui/icons-material/Payment';
 import DeleteIcon from '@mui/icons-material/Delete';
-import { adminService, feesService } from '../services/api.service';
+import ReceiptIcon from '@mui/icons-material/Receipt';
+import MarkEmailReadIcon from '@mui/icons-material/MarkEmailRead';
+import { adminService, feesService, paystackService, type PaymentAttempt } from '../services/api.service';
+import { documentService } from '../services/pdf';
 import { isAdminRole, useCurrentUser } from '../hooks/useCurrentUser';
 import { formatCurrency } from '../utils/currency';
 
@@ -33,6 +38,7 @@ interface Student {
   firstName: string;
   lastName: string;
   email: string;
+  matricNumber?: string | null;
 }
 interface InvoiceLine {
   id: string;
@@ -44,6 +50,7 @@ interface Payment {
   amount: string;
   method: string;
   paidAt: string;
+  transactionId?: string | null;
 }
 interface Invoice {
   id: string;
@@ -56,6 +63,19 @@ interface Invoice {
   payments: Payment[];
   student: Student;
 }
+
+const PAYABLE = (invoice: Invoice) => {
+  const balance = Number(invoice.totalAmount) - Number(invoice.paidAmount);
+  return balance > 0 && invoice.status !== 'DRAFT' && invoice.status !== 'PAID' && invoice.status !== 'VOID';
+};
+
+const ATTEMPT_COLOR: Record<string, 'success' | 'warning' | 'error' | 'default'> = {
+  SUCCESS: 'success',
+  STARTED: 'default',
+  PENDING: 'default',
+  FAILED: 'error',
+  EXPIRED: 'warning',
+};
 
 const STATUS_COLOR: Record<string, 'success' | 'warning' | 'default'> = {
   PAID: 'success',
@@ -72,6 +92,7 @@ const emptyInvoiceForm = {
 const Fees: React.FC = () => {
   const user = useCurrentUser();
   const isAdmin = isAdminRole(user?.role);
+  const [searchParams] = useSearchParams();
 
   const [invoices, setInvoices] = React.useState<Invoice[]>([]);
   const [students, setStudents] = React.useState<Student[]>([]);
@@ -84,6 +105,10 @@ const Fees: React.FC = () => {
 
   const [paymentInvoiceId, setPaymentInvoiceId] = React.useState<string | null>(null);
   const [paymentForm, setPaymentForm] = React.useState({ amount: '', method: 'CARD' });
+
+  const [attempts, setAttempts] = React.useState<PaymentAttempt[]>([]);
+  const [payingId, setPayingId] = React.useState<string | null>(null);
+  const [landedReference, setLandedReference] = React.useState('');
 
   const showSuccess = (message: string) => {
     setSuccess(message);
@@ -103,13 +128,73 @@ const Fees: React.FC = () => {
     }
   };
 
+  const fetchAttempts = async () => {
+    try {
+      const response = await paystackService.listSessions();
+      setAttempts(response.data.data);
+    } catch {
+      // Card attempts are supplementary detail; the invoice table above is the
+      // record that matters, so a failure here is not shown as an error.
+      setAttempts([]);
+    }
+  };
+
   React.useEffect(() => {
     fetchInvoices();
+    fetchAttempts();
+    // Paystack brings the student back to this page with ?reference=..., a few
+    // seconds ahead of its own webhook, so the invoice will not have moved yet.
+    const reference = searchParams.get('reference');
+    if (reference) setLandedReference(reference);
     if (isAdmin) {
       adminService.listStudents({ limit: 100 }).then((res) => setStudents(res.data.data)).catch(() => {});
     }
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
+
+  const handlePay = async (invoice: Invoice) => {
+    setPayingId(invoice.id);
+    setError('');
+    try {
+      const response = await paystackService.begin(invoice.id);
+      // Paystack holds the card details, so the student leaves the portal for
+      // the checkout page and returns through the webhook.
+      window.location.assign(response.data.data.authorizationUrl);
+    } catch (err: any) {
+      setError(err?.response?.data?.message || err?.message || 'The payment page could not be opened. Please try again.');
+      setPayingId(null);
+      fetchAttempts();
+    }
+  };
+
+  const handleReminders = async () => {
+    setLoading(true);
+    setError('');
+    try {
+      const response = await feesService.flagOverdue();
+      const count = response.data.data.reminded;
+      // The database refuses to chase the same student twice in a week, so zero
+      // is the normal answer to a second click - it should not read like a failure.
+      showSuccess(
+        count === 0
+          ? 'No reminders went out: every overdue invoice has already been chased in the last seven days.'
+          : count === 1
+            ? 'One student has been reminded about their overdue fees.'
+            : `${count} students have been reminded about their overdue fees.`,
+      );
+    } catch (err: any) {
+      setError(err?.response?.data?.message || 'The overdue reminders could not be sent.');
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  const handleReceipt = (invoice: Invoice) => {
+    documentService.printReceipt({
+      student: { ...(invoice.student ?? {}), matricNumber: invoice.student?.matricNumber },
+      invoice,
+    });
+  };
 
   const updateLine = (index: number, field: 'description' | 'amount', value: string) => {
     const lines = [...invoiceForm.lines];
@@ -172,14 +257,41 @@ const Fees: React.FC = () => {
           </Typography>
         </Box>
         {isAdmin && (
-          <Button variant="contained" startIcon={<AddIcon />} onClick={() => setInvoiceDialogOpen(true)}>
-            New Invoice
-          </Button>
+          <Box sx={{ display: 'flex', gap: 1, flexWrap: 'wrap' }}>
+            <Button variant="outlined" startIcon={<MarkEmailReadIcon />} onClick={() => void handleReminders()}>
+              Send overdue reminders
+            </Button>
+            <Button variant="contained" startIcon={<AddIcon />} onClick={() => setInvoiceDialogOpen(true)}>
+              New Invoice
+            </Button>
+          </Box>
         )}
       </Box>
 
       {error && <Alert severity="error" sx={{ mb: 2 }} onClose={() => setError('')}>{error}</Alert>}
       {success && <Alert severity="success" sx={{ mb: 2 }} onClose={() => setSuccess('')}>{success}</Alert>}
+      {landedReference && (
+        <Alert
+          severity="info"
+          sx={{ mb: 2 }}
+          onClose={() => setLandedReference('')}
+          action={
+            <Button
+              size="small"
+              color="inherit"
+              onClick={() => {
+                void fetchInvoices();
+                void fetchAttempts();
+              }}
+            >
+              Refresh
+            </Button>
+          }
+        >
+          You came back from Paystack after paying {landedReference}. The invoice updates as soon as their
+          server confirms the charge with us, which usually takes a few seconds.
+        </Alert>
+      )}
       {loading && <CircularProgress sx={{ mb: 2 }} />}
 
       <Card>
@@ -193,7 +305,7 @@ const Fees: React.FC = () => {
                 <TableCell align="right" sx={{ fontWeight: 600 }}>Total</TableCell>
                 <TableCell align="right" sx={{ fontWeight: 600 }}>Paid</TableCell>
                 <TableCell sx={{ fontWeight: 600 }}>Status</TableCell>
-                {isAdmin && <TableCell sx={{ fontWeight: 600 }}>Actions</TableCell>}
+                <TableCell align="right" sx={{ fontWeight: 600 }}>Actions</TableCell>
               </TableRow>
             </TableHead>
             <TableBody>
@@ -220,16 +332,43 @@ const Fees: React.FC = () => {
                           setPaymentForm({ amount: '', method: 'CARD' });
                         }}
                         disabled={invoice.status === 'PAID'}
+                        title="Record a payment made outside the portal"
                       >
                         <PaymentIcon fontSize="small" />
                       </IconButton>
                     </TableCell>
                   )}
+                  <TableCell align="right">
+                    <Box sx={{ display: 'flex', gap: 1, alignItems: 'center', justifyContent: 'flex-end' }}>
+                      {!isAdmin && PAYABLE(invoice) && (
+                        <Button
+                          size="small"
+                          variant="contained"
+                          disabled={payingId === invoice.id}
+                          onClick={() => void handlePay(invoice)}
+                          startIcon={
+                            payingId === invoice.id ? (
+                              <CircularProgress size={16} color="inherit" />
+                            ) : (
+                              <PaymentIcon fontSize="small" />
+                            )
+                          }
+                        >
+                          {payingId === invoice.id
+                            ? 'Opening…'
+                            : `Pay ${formatCurrency(Number(invoice.totalAmount) - Number(invoice.paidAmount))}`}
+                        </Button>
+                      )}
+                      <IconButton size="small" onClick={() => handleReceipt(invoice)} title="Print a receipt">
+                        <ReceiptIcon fontSize="small" />
+                      </IconButton>
+                    </Box>
+                  </TableCell>
                 </TableRow>
               ))}
               {invoices.length === 0 && !loading && (
                 <TableRow>
-                  <TableCell colSpan={isAdmin ? 7 : 5}>
+                  <TableCell colSpan={isAdmin ? 8 : 6}>
                     <Typography variant="body2" color="text.secondary">
                       No invoices yet.
                     </Typography>
@@ -240,6 +379,48 @@ const Fees: React.FC = () => {
           </Table>
         </TableContainer>
       </Card>
+
+      {attempts.length > 0 && (
+        <Card sx={{ mt: 3 }}>
+          <CardContent>
+            <Typography variant="subtitle1" sx={{ fontWeight: 700, mb: 1 }}>
+              Card payment attempts
+            </Typography>
+            <Typography variant="body2" color="text.secondary" sx={{ mb: 2 }}>
+              Opening the payment page is recorded here even when a card is never charged. Only Paystack&rsquo;s own
+              confirmation can mark an invoice as paid.
+            </Typography>
+            <Box sx={{ display: 'flex', flexDirection: 'column', gap: 1 }}>
+              {attempts.map((attempt) => (
+                <Box
+                  key={attempt.id}
+                  sx={{
+                    display: 'flex',
+                    gap: 1.5,
+                    alignItems: 'center',
+                    flexWrap: 'wrap',
+                    border: (t) => `1px solid ${t.palette.divider}`,
+                    borderRadius: 2,
+                    px: 1.5,
+                    py: 1,
+                  }}
+                >
+                  <Chip label={attempt.status} size="small" color={ATTEMPT_COLOR[attempt.status] || 'default'} />
+                  <Typography variant="body2">{attempt.reference}</Typography>
+                  <Typography variant="body2" color="text.secondary">
+                    {formatCurrency(attempt.amount)} · {new Date(attempt.createdAt).toLocaleString()}
+                  </Typography>
+                  {attempt.failureReason && (
+                    <Typography variant="body2" color="error.main">
+                      {attempt.failureReason}
+                    </Typography>
+                  )}
+                </Box>
+              ))}
+            </Box>
+          </CardContent>
+        </Card>
+      )}
 
       <Dialog open={invoiceDialogOpen} onClose={() => setInvoiceDialogOpen(false)} fullWidth>
         <DialogTitle>New Invoice</DialogTitle>

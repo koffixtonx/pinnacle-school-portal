@@ -30,6 +30,9 @@ import Brightness7Icon from '@mui/icons-material/Brightness7';
 import EventAvailableIcon from '@mui/icons-material/EventAvailable';
 import GradeIcon from '@mui/icons-material/Grade';
 import ReceiptLongIcon from '@mui/icons-material/ReceiptLong';
+import AssignmentTurnedInIcon from '@mui/icons-material/AssignmentTurnedIn';
+import CalendarMonthIcon from '@mui/icons-material/CalendarMonth';
+import CampaignIcon from '@mui/icons-material/Campaign';
 import { useCurrentUser, type Role } from '../hooks/useCurrentUser';
 import EmailIcon from '@mui/icons-material/Email';
 import LocationOnIcon from '@mui/icons-material/LocationOn';
@@ -108,8 +111,28 @@ const StyledInputBase = styled(InputBase)(({ theme }) => ({
 }));
 
 const drawerWidth = 260;
+
+// A parent sits outside the register: the academic pages have nothing of theirs
+// to show, so the drawer must not offer them. Office staff keep the pages their
+// own route guards allow.
+const ACADEMIC_ROLES: Role[] = ['SUPER_ADMIN', 'SCHOOL_ADMIN', 'TEACHER', 'STUDENT'];
 const navItems: { label: string; description: string; to: string; icon: React.ReactNode; roles?: Role[] }[] = [
   { label: 'Welcome', description: 'Open welcome page', to: '/', icon: <HomeIcon /> },
+  {
+    label: 'Announcements',
+    description: 'Read what the school has sent you',
+    to: '/announcements',
+    icon: <CampaignIcon />,
+  },
+  {
+    // Not "Announcements" again: the drawer shows both entries to an
+    // administrator at once, and two identical labels read as a bug.
+    label: 'Announcement Review',
+    description: 'Write and publish notices',
+    to: '/announcement-review',
+    icon: <CampaignIcon />,
+    roles: ['SUPER_ADMIN', 'SCHOOL_ADMIN'],
+  },
   {
     label: 'Dashboard',
     description: 'Go to dashboard',
@@ -152,11 +175,57 @@ const navItems: { label: string; description: string; to: string; icon: React.Re
     icon: <SchoolIcon />,
     roles: ['SUPER_ADMIN', 'SCHOOL_ADMIN'],
   },
-  { label: 'Timetable', description: 'Open timetable', to: '/timetable', icon: <EventNoteIcon /> },
-  { label: 'Courses', description: 'Browse courses', to: '/courses', icon: <MenuBookIcon /> },
-  { label: 'Course Catalogue', description: 'Browse faculty course hierarchy', to: '/course-catalog', icon: <MenuBookIcon /> },
-  { label: 'Attendance', description: 'Track attendance', to: '/attendance', icon: <EventAvailableIcon /> },
-  { label: 'Grades', description: 'View and enter grades', to: '/grades', icon: <GradeIcon /> },
+  {
+    label: 'Timetable',
+    description: 'Open timetable',
+    to: '/timetable',
+    icon: <EventNoteIcon />,
+    roles: ['SUPER_ADMIN', 'SCHOOL_ADMIN', 'TEACHER', 'STUDENT', 'NON_ACADEMIC_STAFF'],
+  },
+  {
+    label: 'Courses',
+    description: 'Browse courses',
+    to: '/courses',
+    icon: <MenuBookIcon />,
+    roles: ['SUPER_ADMIN', 'SCHOOL_ADMIN', 'TEACHER', 'STUDENT', 'NON_ACADEMIC_STAFF'],
+  },
+  {
+    label: 'Course Catalogue',
+    description: 'Browse faculty course hierarchy',
+    to: '/course-catalog',
+    icon: <MenuBookIcon />,
+    roles: ['SUPER_ADMIN', 'SCHOOL_ADMIN', 'TEACHER', 'STUDENT', 'NON_ACADEMIC_STAFF'],
+  },
+  {
+    label: 'Academic Calendar',
+    description: 'Sessions, semesters, grade scale and registration settings',
+    to: '/academic-calendar',
+    icon: <CalendarMonthIcon />,
+    roles: ['SUPER_ADMIN', 'SCHOOL_ADMIN'],
+  },
+  {
+    label: 'Register Courses',
+    description: 'Choose your courses for the semester',
+    to: '/course-registration',
+    icon: <MenuBookIcon />,
+    roles: ['STUDENT'],
+  },
+  {
+    label: 'Registration Requests',
+    description: 'Approve or reject course registrations',
+    to: '/course-registration-review',
+    icon: <AssignmentTurnedInIcon />,
+    roles: ['SUPER_ADMIN', 'SCHOOL_ADMIN'],
+  },
+  { label: 'Attendance', description: 'Track attendance', to: '/attendance', icon: <EventAvailableIcon />, roles: ACADEMIC_ROLES },
+  { label: 'Grades', description: 'View and enter grades', to: '/grades', icon: <GradeIcon />, roles: ACADEMIC_ROLES },
+  {
+    label: 'Results',
+    description: 'Your GPA, CGPA and transcript',
+    to: '/results',
+    icon: <GradeIcon />,
+    roles: ['STUDENT'],
+  },
   {
     label: 'Fees',
     description: 'Invoices and payments',

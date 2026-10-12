@@ -80,7 +80,7 @@ values ('00000000-0000-0000-0000-000000000041',
         '00000000-0000-0000-0000-0000000000c1', 'Midterm', now(), now() + interval '30 days'),
        ('00000000-0000-0000-0000-000000000042',
         (select id from public.tenants where slug = 'pinnacle-school'),
-        '00000000-0000-0000-0000-0000000000c2', 'Midterm', now(), now() + interval '30 days')
+        '00000000-0000-0000-0000-0000000000c2', 'Final Exam', now(), now() + interval '30 days')
 on conflict do nothing;
 
 -- No grade_entries fixture: guard_grade_entry_write() rejects any caller who is
@@ -121,3 +121,32 @@ insert into public.site_settings (tenant_id, primary_color, secondary_color, wel
 select id, '#1976D2', '#E91E63', '#FFFFFF'
   from public.tenants where slug = 'riverside-college'
 on conflict (tenant_id) do nothing;
+
+-- ---------------------------------------------------------------------------
+-- Academic calendar (0006). Dates are relative so the suite keeps passing: the
+-- semester window has to contain the grade periods above, which start today.
+-- ---------------------------------------------------------------------------
+insert into public.academic_sessions (id, tenant_id, name, start_date, end_date, is_active)
+values ('00000000-0000-0000-0000-0000000000a6',
+        (select id from public.tenants where slug = 'pinnacle-school'),
+        '2025/2026', current_date - 120, current_date + 120, true)
+on conflict do nothing;
+
+insert into public.semesters (id, tenant_id, academic_session_id, name, number, start_date, end_date, is_active)
+values ('00000000-0000-0000-0000-0000000000a7',
+        (select id from public.tenants where slug = 'pinnacle-school'),
+        '00000000-0000-0000-0000-0000000000a6',
+        'First Semester', 1, current_date - 30, current_date + 90, true)
+on conflict do nothing;
+
+-- An open registration window with a ceiling low enough that two 6-unit courses
+-- fill the semester.
+update public.academic_settings
+   set registration_opens_at  = now() - interval '1 day',
+       registration_closes_at = now() + interval '60 days',
+       min_credit_units       = 3,
+       max_credit_units       = 12
+ where tenant_id = (select id from public.tenants where slug = 'pinnacle-school');
+
+-- Riverside deliberately has no session, semester or window: registering there
+-- must fail for a reason the school can read.

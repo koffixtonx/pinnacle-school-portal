@@ -9,7 +9,7 @@ import {
   unwrap,
 } from './api';
 
-const PROFILE_COLUMNS = 'id, email, first_name, last_name, phone, role';
+const PROFILE_COLUMNS = 'id, email, first_name, last_name, phone, role, matric_number';
 
 const NIGERIAN_PHONE_PATTERN = /^(?:\+234|234|0)(?:7|8|9)\d{9}$/;
 const STUDENT_STATUSES = ['ACTIVE', 'INACTIVE', 'ON_PROBATION'];
@@ -21,6 +21,10 @@ const MAX_WELCOME_BACKGROUNDS = 8;
 const normalizePhone = (phone: string) => phone.replace(/[\s().-]/g, '');
 
 const asArray = <T,>(value: T[] | null | undefined): T[] => value ?? [];
+
+/** courses.credit_units is checked by the database as 1..24 (0006). */
+const isCreditUnitCount = (value: unknown) =>
+  typeof value === 'number' && Number.isInteger(value) && value >= 1 && value <= 24;
 
 /**
  * `{ data: { success, data } }` mirrors the envelope the pages already unwrap
@@ -130,6 +134,136 @@ export const authService = {
     }
     const { error } = await supabase.auth.updateUser({ password: newPassword });
     if (error) throw toServiceError(error, 'Your password could not be changed.');
+    return { data: { success: true } };
+  },
+
+  /**
+   * Matric numbers are issued by the registry, so the only way to sign in with
+   * one is to ask the database which account it belongs to - which it will only
+   * say when the surname matches too. The password then goes through the normal
+   * sign-in, so a wrong password still reads as "Invalid credentials".
+   */
+  async loginByMatric(matricNumber: string, lastName: string, password: string) {
+    const number = matricNumber?.trim();
+    const surname = lastName?.trim();
+    if (!number || !surname) throw new ServiceError('Enter both your matric number and your surname.');
+
+    const email = unwrap(
+      await supabase.rpc('resolve_login_email', { p_matric_number: number, p_last_name: surname }),
+      'No student matches that matric number and surname.',
+    );
+    if (typeof email !== 'string' || !email) throw new ServiceError('No student matches that matric number and surname.');
+
+    return this.login(email, password);
+  },
+
+  async requestPasswordReset(email: string) {
+    const address = email?.trim();
+    if (!address) throw new ServiceError('Enter the email address you signed up with.');
+
+    const { error } = await supabase.auth.resetPasswordForEmail(address, {
+      redirectTo: `${window.location.origin}/reset-password`,
+    });
+    if (error) throw toServiceError(error, 'The reset email could not be sent.');
+
+    // GoTrue answers the same way whether or not the address exists, and this
+    // must not become a way to test which emails have accounts here.
+    return envelope({ message: 'If that address has an account, a reset link is on its way.' });
+  },
+
+  /**
+   * The reset link Supabase sends carries a PKCE `code`, and `detectSessionInUrl`
+   * is off in this client, so the code is exchanged by hand before the new
+   * password is written.
+   */
+  async completePasswordReset(newPassword: string, code?: string) {
+    if (typeof newPassword !== 'string' || newPassword.length < 8) {
+      throw new ServiceError('Your new password must be at least 8 characters.');
+    }
+
+    if (code) {
+      const { error: exchangeError } = await supabase.auth.exchangeCodeForSession(code);
+      if (exchangeError) {
+        throw toServiceError(exchangeError, 'That reset link is no longer valid. Request another one.');
+      }
+    }
+
+    const { data, error } = await supabase.auth.updateUser({ password: newPassword });
+    if (error) {
+      throw toServiceError(error, 'Your password could not be changed. Request a new reset link.');
+    }
+    if (!data.user) throw new ServiceError('Open the reset link from your email before choosing a new password.');
+
+    return { data: { success: true } };
+  },
+};
+
+/**
+ * Two-factor codes live in GoTrue, not in the portal's tables: `auth.mfa` is the
+ * only authority on whether a factor exists and whether it has been verified
+ * this session, so nothing here is mirrored into Postgres.
+ */
+export const mfaService = {
+  async status() {
+    const { data, error } = await supabase.auth.mfa.listFactors();
+    if (error) throw toServiceError(error, 'Two-factor status is unavailable.');
+    const verified = data?.totp ?? [];
+    const pending = (data?.all ?? []).filter((factor) => factor.factor_type === 'totp' && factor.status !== 'verified');
+    return envelope({
+      enrolled: verified.length > 0,
+      /** Enrolled but never confirmed with a code, so it cannot be signed in with. */
+      awaitingConfirmation: pending.length > 0,
+      factorId: verified[0]?.id ?? pending[0]?.id ?? null,
+    });
+  },
+
+  /** Whether this session has already proved a second factor. */
+  async isVerified(): Promise<boolean> {
+    const { data, error } = await supabase.auth.mfa.getAuthenticatorAssuranceLevel();
+    if (error || !data) return false;
+    return data.currentLevel === 'aal2';
+  },
+
+  async enrol(friendlyName = 'Authenticator app') {
+    const { data, error } = await supabase.auth.mfa.enroll({ factorType: 'totp', friendlyName });
+    if (error) throw toServiceError(error, 'Two-factor could not be set up.');
+    if (!data?.totp) throw new ServiceError('Two-factor could not be set up.');
+    return envelope({
+      factorId: data.id,
+      // The app shows the secret as text beside the picture, because an
+      // authenticator that will not scan a QR code will still take a typed key.
+      secret: data.totp.secret,
+      qrCode: data.totp.qr_code,
+      uri: data.totp.uri,
+    });
+  },
+
+  /**
+   * A code is proved against a fresh challenge every time: Supabase invalidates
+   * a challenge once it is used, so a saved one cannot be replayed.
+   */
+  async confirm(factorId: string, code: string) {
+    const digits = String(code ?? '').replace(/\D/g, '');
+    if (digits.length !== 6) throw new ServiceError('Enter the 6-digit code from your authenticator app.');
+
+    const { data: challenge, error: challengeError } = await supabase.auth.mfa.challenge({ factorId });
+    if (challengeError) throw toServiceError(challengeError, 'The verification request expired. Try again.');
+
+    const { error: verifyError } = await supabase.auth.mfa.verify({
+      factorId,
+      challengeId: challenge.id,
+      code: digits,
+    });
+    // GoTrue answers a wrong code with "Invalid TOTP code entered", which tells
+    // the student nothing; every failure here means the same two things.
+    if (verifyError) throw new ServiceError('That code did not match or has expired. Check your app and try again.');
+
+    return { data: { success: true } };
+  },
+
+  async disable(factorId: string) {
+    const { error } = await supabase.auth.mfa.unenroll({ factorId });
+    if (error) throw toServiceError(error, 'Two-factor could not be turned off.');
     return { data: { success: true } };
   },
 };
@@ -245,6 +379,23 @@ export const adminService = {
   async deleteStudent(id: string) {
     unwrap(await supabase.from('profiles').delete().eq('id', id).eq('role', 'STUDENT'), 'Could not remove the student.');
     return { data: { success: true } };
+  },
+
+  /**
+   * Issuing or clearing a matric number goes through the database rather than a
+   * plain UPDATE: the RPC enforces the unique-per-tenant shape and writes the
+   * audit row, and it refuses anyone who is not an administrator.
+   */
+  async setStudentMatricNumber(profileId: string, matricNumber: string) {
+    if (!profileId) throw new ServiceError('Tell us which student this number belongs to.');
+    const value = String(matricNumber ?? '').trim();
+
+    const row = unwrap(
+      await supabase.rpc('set_student_matric_number', { p_profile_id: profileId, p_matric_number: value || null }),
+      'The matric number could not be saved.',
+    );
+    if (!row) throw new ServiceError('Student not found.');
+    return envelope(camel(typeof row === 'object' ? row : { id: profileId, matricNumber: value }));
   },
 
   async listTeachers() {
@@ -412,7 +563,7 @@ export const academicsService = {
       unwrap(
         await supabase
           .from('courses')
-          .select(`id, title, code, description, level, created_at, ${COURSE_TEACHERS}, enrollments(count)`)
+          .select(`id, title, code, description, level, credit_units, created_at, ${COURSE_TEACHERS}, enrollments(count)`)
           .order('title', { ascending: true }),
         'Failed to load courses.',
       ),
@@ -437,13 +588,29 @@ export const academicsService = {
     return envelope(faculties);
   },
 
-  async createCourse(title: string, code: string, description: string, teacherIds?: string[], level?: string) {
+  async createCourse(
+    title: string,
+    code: string,
+    description: string,
+    teacherIds?: string[],
+    level?: string,
+    creditUnits?: number,
+  ) {
     if (!title || !code) throw new ServiceError('title and code are required.');
+    if (creditUnits !== undefined && !isCreditUnitCount(creditUnits)) {
+      throw new ServiceError('Credit units must be a whole number between 1 and 24.');
+    }
     const row = unwrap(
       await supabase
         .from('courses')
-        .insert({ title, code, description: description ?? '', level: level ?? '100' })
-        .select(`id, title, code, description, level, ${COURSE_TEACHERS}`)
+        .insert({
+          title,
+          code,
+          description: description ?? '',
+          level: level ?? '100',
+          credit_units: creditUnits ?? 3,
+        })
+        .select(`id, title, code, description, level, credit_units, ${COURSE_TEACHERS}`)
         .single(),
       'Could not create the course.',
     );
@@ -456,7 +623,7 @@ export const academicsService = {
       );
     }
     const reloaded = unwrap(
-      await supabase.from('courses').select(`id, title, code, description, level, ${COURSE_TEACHERS}`).eq('id', row.id).single(),
+      await supabase.from('courses').select(`id, title, code, description, level, credit_units, ${COURSE_TEACHERS}`).eq('id', row.id).single(),
       'Could not read the course back.',
     );
     return envelope(flattenTeachers(camel(reloaded)));
@@ -464,13 +631,27 @@ export const academicsService = {
 
   async updateCourse(
     id: string,
-    data: Partial<{ title: string; code: string; description: string; teacherIds: string[]; level: string; departmentId: string | null }>,
+    data: Partial<{
+      title: string;
+      code: string;
+      description: string;
+      teacherIds: string[];
+      level: string;
+      creditUnits: number;
+      departmentId: string | null;
+    }>,
   ) {
     const patch: Record<string, unknown> = {};
     if (data.title !== undefined) patch.title = data.title;
     if (data.code !== undefined) patch.code = data.code;
     if (data.description !== undefined) patch.description = data.description;
     if (data.level !== undefined) patch.level = data.level;
+    if (data.creditUnits !== undefined) {
+      if (!isCreditUnitCount(data.creditUnits)) {
+        throw new ServiceError('Credit units must be a whole number between 1 and 24.');
+      }
+      patch.credit_units = data.creditUnits;
+    }
     if (data.departmentId !== undefined) patch.department_id = data.departmentId;
 
     if (Object.keys(patch).length) {
@@ -489,7 +670,7 @@ export const academicsService = {
     }
 
     const row = unwrap(
-      await supabase.from('courses').select(`id, title, code, description, level, ${COURSE_TEACHERS}`).eq('id', id).single(),
+      await supabase.from('courses').select(`id, title, code, description, level, credit_units, ${COURSE_TEACHERS}`).eq('id', id).single(),
       'Could not read the course back.',
     );
     return envelope(flattenTeachers(camel(row)));
@@ -837,9 +1018,12 @@ export const gradesService = {
   },
 
   async listEntries(params?: { courseId?: string; gradePeriodId?: string }) {
+    // `!inner` makes the course filter below a real join. Without it PostgREST keeps
+    // the non-matching parents and hands them back with gradePeriod: null.
+    const periodTable = params?.courseId ? 'grade_periods!inner' : 'grade_periods';
     let query = supabase
       .from('grade_entries')
-      .select('id, score, letter_grade, comments, recorded_at, gradePeriod:grade_periods(id, name, course_id), enrollment:enrollments(id, student_id)')
+      .select(`id, score, letter_grade, status, comments, recorded_at, gradePeriod:${periodTable}(id, name, course_id), enrollment:enrollments(id, student_id)`)
       .order('recorded_at', { ascending: false })
       .limit(200);
     if (params?.gradePeriodId) query = query.eq('grade_period_id', params.gradePeriodId);
@@ -870,6 +1054,52 @@ export const gradesService = {
     );
     return envelope(camel(row));
   },
+
+  /** How many books of each status a grade period holds, for the workflow bar. */
+  countByStatus(entries: Array<{ status?: string }>) {
+    return entries.reduce<Record<string, number>>((totals, entry) => {
+      const status = entry.status ?? 'DRAFT';
+      totals[status] = (totals[status] ?? 0) + 1;
+      return totals;
+    }, {});
+  },
+
+  async submitPeriod(gradePeriodId: string) {
+    if (!gradePeriodId) throw new ServiceError('Select a grade period first.');
+    const count = unwrap(
+      await supabase.rpc('submit_grade_period', { p_grade_period_id: gradePeriodId }),
+      'Could not submit these results.',
+    );
+    return envelope({ submitted: Number(count ?? 0) });
+  },
+
+  async reviewPeriod(gradePeriodId: string, approve: boolean) {
+    if (!gradePeriodId) throw new ServiceError('Select a grade period first.');
+    const count = unwrap(
+      await supabase.rpc('review_grade_period', { p_grade_period_id: gradePeriodId, p_approve: approve }),
+      'Could not review these results.',
+    );
+    return envelope({ reviewed: Number(count ?? 0) });
+  },
+
+  async publishPeriod(gradePeriodId: string) {
+    if (!gradePeriodId) throw new ServiceError('Select a grade period first.');
+    const count = unwrap(
+      await supabase.rpc('publish_grade_period', { p_grade_period_id: gradePeriodId }),
+      'Could not publish these results.',
+    );
+    return envelope({ published: Number(count ?? 0) });
+  },
+
+  /** Pull an approved or published book back to draft so a score can be corrected. */
+  async reopenPeriod(gradePeriodId: string) {
+    if (!gradePeriodId) throw new ServiceError('Select a grade period first.');
+    const count = unwrap(
+      await supabase.rpc('reopen_grade_period', { p_grade_period_id: gradePeriodId }),
+      'Could not reopen these results.',
+    );
+    return envelope({ reopened: Number(count ?? 0) });
+  },
 };
 
 export const feesService = {
@@ -895,7 +1125,7 @@ export const feesService = {
   async listInvoices(studentId?: string) {
     let query = supabase
       .from('invoices')
-      .select('id, reference, status, due_date, total_amount, paid_amount, created_at, lines:invoice_lines(id, description, amount), payments(*), student:profiles!invoices_student_id_fkey(id, first_name, last_name, email)')
+      .select('id, reference, status, due_date, total_amount, paid_amount, created_at, lines:invoice_lines(id, description, amount), payments(*), student:profiles!invoices_student_id_fkey(id, first_name, last_name, email, matric_number)')
       .order('created_at', { ascending: false })
       .limit(200);
     if (studentId) query = query.eq('student_id', studentId);
@@ -972,7 +1202,114 @@ export const feesService = {
     );
     return envelope(camel(row));
   },
+
+  /**
+   * The bursar's "send overdue reminders" button. The database does the chasing
+   * and refuses to repeat itself inside a week, so this is safe to click twice.
+   */
+  async flagOverdue() {
+    const reminded = unwrap(
+      await supabase.rpc('flag_overdue_invoices'),
+      'The overdue reminders could not be sent.',
+    );
+    return envelope({ reminded: Number(reminded ?? 0) });
+  },
 };
+
+/**
+ * Paystack lives behind the two Edge Functions in supabase/functions: the browser
+ * can open a checkout session and read its own attempts, and nothing more. The
+ * money itself is only ever recorded by the webhook, whose signature the browser
+ * cannot forge.
+ */
+export type PaymentAttempt = {
+  id: string;
+  reference: string;
+  invoiceId: string;
+  amount: string;
+  currency: string;
+  status: 'PENDING' | 'STARTED' | 'SUCCESS' | 'FAILED' | 'EXPIRED';
+  email: string | null;
+  authorizationUrl: string | null;
+  failureReason: string | null;
+  createdAt: string;
+};
+
+export const paystackService = {
+  async begin(invoiceId: string, options?: { email?: string; amount?: number }) {
+    if (!invoiceId) throw new ServiceError('Tell us which invoice you want to pay.');
+
+    const { data, error } = await supabase.functions.invoke('paystack-initiate', {
+      body: { invoiceId, email: options?.email ?? null, amount: options?.amount ?? null },
+    });
+    if (error) throw await functionError(error);
+
+    const session = camel<{ reference?: string; authorizationUrl?: string }>(data);
+    const authorizationUrl = session?.authorizationUrl;
+    if (!authorizationUrl) {
+      throw new ServiceError('The payment page did not open. Please try again in a moment.');
+    }
+    return envelope({ reference: session?.reference ?? null, authorizationUrl });
+  },
+
+  /**
+   * Sessions the caller can see: a student's own, or the whole school's for an
+   * administrator. RLS decides the reach, so this is one query for both pages.
+   */
+  async listSessions(limit = 20) {
+    const rows = camel(asArray(
+      unwrap(
+        await supabase
+          .from('payment_attempts')
+          .select('id, reference, invoice_id, student_id, amount, currency, status, email, authorization_url, failure_reason, created_at, updated_at')
+          .order('created_at', { ascending: false })
+          .limit(limit),
+        'Your payment attempts could not be loaded.',
+      ),
+    ));
+    return envelope(rows);
+  },
+
+  /** The delivery log, which only an administrator's RLS policy lets through. */
+  async listWebhookEvents(limit = 50) {
+    const rows = camel(asArray(
+      unwrap(
+        await supabase
+          .from('webhook_events')
+          .select('id, event_id, reference, event, result, created_at')
+          .order('created_at', { ascending: false })
+          .limit(limit),
+        'The payment delivery log could not be loaded.',
+      ),
+    ));
+    return envelope(rows);
+  },
+};
+
+/**
+ * A function failure arrives as `FunctionsHttpError`, whose own message is
+ * generic; the reason the student needs is the body the function returned.
+ * Platform complaints ("Function not found", a refused request) describe our
+ * deployment, not the student's action, so they get the friendly copy instead.
+ */
+const PLATFORM_NOISE = /function not found|not_found|no such function|invalid api key|unauthorized|failed to send a request/i;
+
+async function functionError(error: any): Promise<ServiceError> {
+  const response = error?.context;
+  if (response && typeof response.json === 'function') {
+    try {
+      const body = await response.json();
+      if (body?.error && !PLATFORM_NOISE.test(String(body.error))) return new ServiceError(String(body.error));
+    } catch {
+      // A gateway that answers with HTML has nothing useful to say here.
+    }
+  }
+  const message = String(error?.message ?? '');
+  if (!message || PLATFORM_NOISE.test(message)) {
+    return new ServiceError('The payment service is not reachable right now. Please try again in a moment, or pay at the bursar.');
+  }
+  return new ServiceError(message);
+}
 
 export const notificationsService = {
   async list() {
@@ -1157,6 +1494,758 @@ export const siteSettingsService = {
       : unwrap(await supabase.from('site_settings').insert({ welcome_background_images: images }).select('welcome_background_images').single(), 'Could not save backgrounds.');
 
     return envelope({ images: asArray(camel<string[]>(saved?.welcome_background_images ?? [])) });
+  },
+};
+
+// ---------------------------------------------------------------------------
+// Academic calendar, course registration and published results
+//
+// The rules live in the database (0006-0008): the credit ceiling, the open
+// window and who may read a result are enforced there, so these methods read
+// back the same verdict the server would give rather than guessing it here.
+// ---------------------------------------------------------------------------
+
+export interface AcademicSession {
+  id: string;
+  name: string;
+  startDate: string;
+  endDate: string;
+  isActive: boolean;
+}
+
+export interface Semester {
+  id: string;
+  academicSessionId: string;
+  name: string;
+  number: number;
+  startDate: string;
+  endDate: string;
+  isActive: boolean;
+  academicSession?: { name: string } | null;
+}
+
+export interface GradeScaleBand {
+  id: string;
+  letter: string;
+  minPercent: number;
+  maxPercent: number;
+  points: number;
+}
+
+export interface AcademicSettings {
+  id?: string;
+  minCreditUnits: number;
+  maxCreditUnits: number;
+  registrationOpensAt: string | null;
+  registrationClosesAt: string | null;
+}
+
+export type RegistrationStatus = 'PENDING' | 'APPROVED' | 'REJECTED' | 'DROPPED';
+
+export interface CourseRegistration {
+  id: string;
+  studentId: string;
+  courseId: string;
+  semesterId: string;
+  creditUnits: number;
+  status: RegistrationStatus;
+  requestedAt: string;
+  reviewedAt: string | null;
+  notes: string | null;
+  course?: { id: string; code: string; title: string; level: string; creditUnits: number } | null;
+  student?: { id: string; firstName: string; lastName: string; email?: string } | null;
+  reviewedBy?: { firstName: string; lastName: string } | null;
+}
+
+/** A row of the registration catalogue: the course plus this student's request. */
+export interface CatalogCourse {
+  id: string;
+  code: string;
+  title: string;
+  description?: string;
+  level?: string;
+  creditUnits: number;
+  registration: { id: string; status: RegistrationStatus; creditUnits: number; requestedAt: string } | null;
+}
+
+export interface ResultCourse {
+  code: string;
+  title: string;
+  creditUnits: number;
+  period: string;
+  score: number;
+  letterGrade: string;
+  gradePoints: number;
+}
+
+export interface ResultSlip {
+  semester?: Record<string, any> | null;
+  session?: Record<string, any> | null;
+  gradeCount: number;
+  gpa: number;
+  creditUnits: number | null;
+  courses: ResultCourse[];
+}
+
+export interface TranscriptSemester {
+  semesterId: string;
+  semester: string;
+  session: string;
+  startDate: string;
+  endDate: string;
+  gpa: number;
+  creditUnits: number | null;
+  courses: ResultCourse[];
+}
+
+export interface Transcript {
+  student: Record<string, any>;
+  cgpa: number;
+  classOfDegree: string;
+  totalCreditUnits: number;
+  semesters: TranscriptSemester[];
+}
+
+const SESSION_SELECT = 'id, name, start_date, end_date, is_active, created_at, updated_at';
+const SEMESTER_SELECT = `id, name, number, start_date, end_date, is_active, academic_session_id, academicSession:academic_sessions(name)`;
+const REGISTRATION_SELECT =
+  'id, student_id, course_id, semester_id, credit_units, status, requested_at, reviewed_at, notes, ' +
+  'course:courses(id, code, title, level, credit_units), ' +
+  'student:profiles!course_registrations_student_id_fkey(id, first_name, last_name, email), ' +
+  'reviewedBy:profiles!course_registrations_reviewed_by_id_fkey(id, first_name, last_name)';
+
+const toAcademicSettings = (row: any): AcademicSettings => ({
+  id: row?.id,
+  minCreditUnits: Number(row?.min_credit_units ?? 10),
+  maxCreditUnits: Number(row?.max_credit_units ?? 30),
+  registrationOpensAt: row?.registration_opens_at ?? null,
+  registrationClosesAt: row?.registration_closes_at ?? null,
+});
+
+export const academicService = {
+  async listSessions() {
+    const rows = camel(asArray(
+      unwrap(
+        await supabase.from('academic_sessions').select(SESSION_SELECT).order('start_date', { ascending: false }),
+        'Failed to load the academic sessions.',
+      ),
+    ));
+    return envelope(rows as AcademicSession[]);
+  },
+
+  async createSession(data: { name: string; startDate: string; endDate: string }) {
+    if (!data.name?.trim()) throw new ServiceError('Give the session a name, such as 2026/2027.');
+    if (!data.startDate || !data.endDate) throw new ServiceError('Both session dates are required.');
+    if (new Date(data.endDate) <= new Date(data.startDate)) {
+      throw new ServiceError('The session must end after it starts.');
+    }
+
+    const row = unwrap(
+      await supabase
+        .from('academic_sessions')
+        .insert({ name: data.name.trim(), start_date: data.startDate, end_date: data.endDate })
+        .select(SESSION_SELECT)
+        .single(),
+      'Could not create the academic session.',
+    );
+    return envelope(camel(row) as AcademicSession);
+  },
+
+  async listSemesters(academicSessionId?: string) {
+    let query = supabase
+      .from('semesters')
+      .select(SEMESTER_SELECT)
+      .order('start_date', { ascending: false })
+      .order('number', { ascending: true });
+    if (academicSessionId) query = query.eq('academic_session_id', academicSessionId);
+
+    const rows = camel(asArray(unwrap(await query, 'Failed to load the semesters.')));
+    return envelope(rows as Semester[]);
+  },
+
+  async createSemester(data: { academicSessionId: string; name: string; number: number; startDate: string; endDate: string }) {
+    if (!data.academicSessionId || !data.name?.trim()) throw new ServiceError('A semester needs its session and a name.');
+    if (!data.startDate || !data.endDate) throw new ServiceError('Both semester dates are required.');
+    if (new Date(data.endDate) <= new Date(data.startDate)) {
+      throw new ServiceError('The semester must end after it starts.');
+    }
+    if (![1, 2, 3].includes(Number(data.number))) {
+      throw new ServiceError('A session has at most three semesters.');
+    }
+
+    const row = unwrap(
+      await supabase
+        .from('semesters')
+        .insert({
+          academic_session_id: data.academicSessionId,
+          name: data.name.trim(),
+          number: Number(data.number),
+          start_date: data.startDate,
+          end_date: data.endDate,
+        })
+        .select(SEMESTER_SELECT)
+        .single(),
+      'Could not create the semester.',
+    );
+    return envelope(camel(row) as Semester);
+  },
+
+  async getActiveSession() {
+    const row = unwrap(await supabase.rpc('active_academic_session'), 'The active session could not be read.');
+    return envelope(row ? (camel(row) as AcademicSession) : null);
+  },
+
+  async getActiveSemester() {
+    const row = unwrap(await supabase.rpc('active_semester'), 'The active semester could not be read.');
+    return envelope(row ? (camel(row) as Semester) : null);
+  },
+
+  async activateSession(id: string) {
+    if (!id) throw new ServiceError('Select a session first.');
+    const row = unwrap(
+      await supabase.rpc('set_active_academic_session', { p_session_id: id }),
+      'Could not activate the academic session.',
+    );
+    return envelope(camel(row) as AcademicSession);
+  },
+
+  async activateSemester(id: string) {
+    if (!id) throw new ServiceError('Select a semester first.');
+    const row = unwrap(
+      await supabase.rpc('set_active_semester', { p_semester_id: id }),
+      'Could not activate the semester.',
+    );
+    return envelope(camel(row) as Semester);
+  },
+
+  async getGradeScale() {
+    const rows = camel(asArray(
+      unwrap(
+        await supabase
+          .from('grade_scale')
+          .select('id, letter, min_percent, max_percent, points, position')
+          .order('position', { ascending: true }),
+        'Failed to load the grade scale.',
+      ),
+    ));
+    return envelope(rows as GradeScaleBand[]);
+  },
+
+  async getSettings() {
+    const row = unwrap(await supabase.rpc('academic_settings_row'), 'The academic settings could not be read.');
+    return envelope(toAcademicSettings(row));
+  },
+
+  async saveSettings(data: {
+    minCreditUnits: number;
+    maxCreditUnits: number;
+    registrationOpensAt?: string | null;
+    registrationClosesAt?: string | null;
+  }) {
+    const min = Number(data.minCreditUnits);
+    const max = Number(data.maxCreditUnits);
+    if (!Number.isInteger(min) || !Number.isInteger(max) || min < 0 || max > 60) {
+      throw new ServiceError('Credit limits must be whole numbers between 0 and 60.');
+    }
+    if (max < min) throw new ServiceError('The maximum credit load must be at least the minimum.');
+
+    const opensAt = data.registrationOpensAt ? new Date(data.registrationOpensAt).toISOString() : null;
+    const closesAt = data.registrationClosesAt ? new Date(data.registrationClosesAt).toISOString() : null;
+    if (opensAt && closesAt && new Date(closesAt) <= new Date(opensAt)) {
+      throw new ServiceError('Registration must close after it opens.');
+    }
+
+    const current = unwrap(await supabase.rpc('academic_settings_row'), 'The academic settings could not be read.');
+    const patch = {
+      min_credit_units: min,
+      max_credit_units: max,
+      registration_opens_at: opensAt,
+      registration_closes_at: closesAt,
+    };
+
+    const saved = current
+      ? unwrap(
+          await supabase.from('academic_settings').update(patch).eq('id', current.id).select('*').single(),
+          'Could not save the academic settings.',
+        )
+      : unwrap(
+          await supabase.from('academic_settings').insert(patch).select('*').single(),
+          'Could not save the academic settings.',
+        );
+    return envelope(toAcademicSettings(saved));
+  },
+
+  /** What the pages show next to the registration buttons. */
+  async getRegistrationWindow() {
+    const [open, message] = await Promise.all([
+      unwrap<number | boolean>(await supabase.rpc('registration_window_open'), 'The registration window could not be read.'),
+      unwrap<string | null>(await supabase.rpc('registration_window_message'), 'The registration window could not be read.'),
+    ]);
+    return envelope({ open: open === true, message: message ?? null });
+  },
+};
+
+export const registrationService = {
+  /**
+   * The courses a learner can register for in the active semester, tagged with
+   * whatever they already requested. Two plain reads instead of a filtered
+   * embed keeps the result the same whether or not a request exists.
+   */
+  async listCatalog() {
+    const semester = unwrap(await supabase.rpc('active_semester'), 'The active semester could not be read.');
+    if (!semester) {
+      throw new ServiceError('This school has no active semester yet. Ask an administrator to activate one.');
+    }
+    const userId = await getCurrentUserId();
+    const semesterId = semester.id as string;
+
+    const courseRows = camel(asArray(
+      unwrap(
+        await supabase
+          .from('courses')
+          .select('id, code, title, description, level, credit_units')
+          .order('code', { ascending: true }),
+        'Failed to load the courses.',
+      ),
+    )) as Record<string, any>[];
+
+    const registrationRows = camel(asArray(
+      unwrap(
+        await supabase
+          .from('course_registrations')
+          .select('id, course_id, credit_units, status, requested_at')
+          .eq('student_id', userId)
+          .eq('semester_id', semesterId),
+        'Failed to load your registrations.',
+      ),
+    )) as Record<string, any>[];
+
+    const byCourse = new Map(registrationRows.map((row) => [row.courseId, row]));
+    const courses: CatalogCourse[] = courseRows.map((course) => ({
+      ...(course as unknown as Omit<CatalogCourse, 'registration'>),
+      registration: (byCourse.get(course.id) ?? null) as CatalogCourse['registration'],
+    }));
+
+    return envelope({ semester: camel(semester) as Semester, courses });
+  },
+
+  async listMine() {
+    const userId = await getCurrentUserId();
+    const rows = camel(asArray(
+      unwrap(
+        await supabase
+          .from('course_registrations')
+          .select(REGISTRATION_SELECT)
+          .eq('student_id', userId)
+          .order('requested_at', { ascending: false }),
+        'Failed to load your registrations.',
+      ),
+    ));
+    return envelope(rows as CourseRegistration[]);
+  },
+
+  async listForReview(params?: { status?: RegistrationStatus; semesterId?: string }) {
+    let query = supabase
+      .from('course_registrations')
+      .select(REGISTRATION_SELECT)
+      .order('requested_at', { ascending: false })
+      .limit(200);
+    if (params?.status) query = query.eq('status', params.status);
+    if (params?.semesterId) query = query.eq('semester_id', params.semesterId);
+
+    const rows = camel(asArray(unwrap(await query, 'Failed to load the registrations.')));
+    return envelope(rows as CourseRegistration[]);
+  },
+
+  async register(courseId: string) {
+    if (!courseId) throw new ServiceError('Select a course to register.');
+    const row = unwrap(
+      await supabase.rpc('register_for_course', { p_course_id: courseId }),
+      'Could not register you for this course.',
+    );
+    return envelope(camel(row) as CourseRegistration);
+  },
+
+  async drop(registrationId: string) {
+    if (!registrationId) throw new ServiceError('Select a registration to drop.');
+    const row = unwrap(
+      await supabase.rpc('drop_course_registration', { p_registration_id: registrationId }),
+      'Could not drop this course.',
+    );
+    return envelope(camel(row) as CourseRegistration);
+  },
+
+  async review(registrationId: string, approve: boolean, notes?: string) {
+    if (!registrationId) throw new ServiceError('Select a registration to review.');
+    const row = unwrap(
+      await supabase.rpc('review_course_registration', {
+        p_registration_id: registrationId,
+        p_approve: approve,
+        p_notes: notes?.trim() || null,
+      }),
+      'Could not review this registration.',
+    );
+    return envelope(camel(row) as CourseRegistration);
+  },
+};
+
+export const resultsService = {
+  /** One semester's published results - the data behind the result slip. */
+  async slip(semesterId?: string) {
+    const userId = await getCurrentUserId();
+    const id = semesterId ?? unwrap(await supabase.rpc('active_semester_id'), 'The active semester could not be read.');
+    if (!id) throw new ServiceError('This school has no active semester yet.');
+
+    const row = unwrap(
+      await supabase.rpc('student_results', { p_student_id: userId, p_semester_id: id }),
+      'Your results could not be loaded.',
+    );
+    const slip = camel<Record<string, any>>(row ?? {});
+    return envelope({
+      semester: slip?.semester ?? null,
+      session: slip?.session ?? null,
+      gradeCount: Number(slip?.gradeCount ?? 0),
+      gpa: Number(slip?.gpa ?? 0),
+      creditUnits: slip?.creditUnits == null ? null : Number(slip.creditUnits),
+      courses: asArray<ResultCourse>(slip?.courses ?? []),
+    } as ResultSlip);
+  },
+
+  async transcript(studentId?: string) {
+    const userId = studentId ?? await getCurrentUserId();
+    const row = unwrap(
+      await supabase.rpc('student_transcript', { p_student_id: userId }),
+      'Your transcript could not be loaded.',
+    );
+    return envelope(camel<Transcript>(row ?? null));
+  },
+};
+
+export type AnnouncementAudience = 'ALL' | 'STUDENTS' | 'TEACHERS' | 'PARENTS' | 'STAFF';
+export type AnnouncementStatus = 'DRAFT' | 'PUBLISHED';
+
+export interface Announcement {
+  id: string;
+  title: string;
+  body: string;
+  audience: AnnouncementAudience;
+  status: AnnouncementStatus;
+  pinned: boolean;
+  publishedAt: string | null;
+  expiresAt: string | null;
+  createdAt: string;
+  author?: { id: string; firstName?: string; lastName?: string } | null;
+  readAt?: string | null;
+}
+
+export interface DeliverySummary {
+  emails: Record<string, number>;
+  readBy: number;
+  audience: number;
+}
+
+export interface GuardianLink {
+  id: string;
+  studentId: string;
+  guardianId: string;
+  relationship: string;
+  createdAt: string;
+  guardian?: { id: string; firstName: string; lastName: string; email: string } | null;
+  student?: {
+    id: string;
+    firstName: string;
+    lastName: string;
+    email: string;
+    matricNumber?: string | null;
+    studentLevel?: string | null;
+    studentStatus?: string | null;
+  } | null;
+}
+
+const ANNOUNCEMENT_SELECT =
+  'id, title, body, audience, status, pinned, published_at, expires_at, created_at, ' +
+  'author:profiles!announcements_author_id_fkey(id, first_name, last_name)';
+
+const GUARDIAN_SELECT =
+  'id, student_id, guardian_id, relationship, created_at, ' +
+  'guardian:profiles!student_guardians_guardian_id_fkey(id, first_name, last_name, email)';
+
+const ANNOUNCEMENT_AUDIENCES: AnnouncementAudience[] = ['ALL', 'STUDENTS', 'TEACHERS', 'PARENTS', 'STAFF'];
+
+/**
+ * Read receipts come from a table whose policy admits only the reader's own
+ * rows, so a second query is both the whole cost and the only honest answer.
+ * Counting them over an embed would show an administrator their own ticks and
+ * call it the school's.
+ */
+async function readStateOf(ids: string[]): Promise<Map<string, string>> {
+  if (!ids.length) return new Map();
+  const rows = camel(asArray(
+    unwrap(
+      await supabase
+        .from('announcement_reads')
+        .select('announcement_id, read_at')
+        .in('announcement_id', ids),
+      'Read receipts could not be loaded.',
+    ),
+  ));
+  return new Map<string, string>(rows.map((row: any) => [row.announcementId, row.readAt]));
+}
+
+const announcementInput = (data: {
+  title: string;
+  body: string;
+  audience: AnnouncementAudience;
+  pinned?: boolean;
+  expiresAt?: string | null;
+}) => {
+  const title = data.title.trim();
+  const body = data.body.trim();
+  if (!title) throw new ServiceError('Give the notice a title.');
+  if (!body) throw new ServiceError('Write the message families are meant to read.');
+  if (!ANNOUNCEMENT_AUDIENCES.includes(data.audience)) throw new ServiceError('Choose who the notice is for.');
+  if (data.expiresAt && Number.isNaN(Date.parse(data.expiresAt))) throw new ServiceError('The expiry date is not a date.');
+  return {
+    title,
+    body,
+    audience: data.audience,
+    pinned: Boolean(data.pinned),
+    expires_at: data.expiresAt || null,
+  };
+};
+
+export const announcementService = {
+  /** The feed a person opens: published, due, not expired, addressed to them. */
+  async list(options?: { offset?: number; limit?: number }) {
+    const offset = Math.max(Number(options?.offset) || 0, 0);
+    const limit = Math.min(Number(options?.limit) || 20, 50);
+    const now = new Date().toISOString();
+    const rows = camel(asArray(
+      unwrap(
+        await supabase
+          .from('announcements')
+          .select(ANNOUNCEMENT_SELECT)
+          .eq('status', 'PUBLISHED')
+          .lte('published_at', now)
+          .or('expires_at.is.null,expires_at.gt.' + now)
+          .order('pinned', { ascending: false })
+          .order('published_at', { ascending: false })
+          .range(offset, offset + limit),
+        'Announcements could not be loaded.',
+      ),
+    )) as Announcement[];
+
+    const hasNext = rows.length > limit;
+    const items = hasNext ? rows.slice(0, limit) : rows;
+    const reads = await readStateOf(items.map((row) => row.id));
+    items.forEach((row) => { row.readAt = reads.get(row.id) ?? null; });
+    return envelope({ items, hasNext });
+  },
+
+  /** Everything the school has written, drafts included - administrators only. */
+  async listForSchool(options?: { status?: AnnouncementStatus | '' }) {
+    let query = supabase
+      .from('announcements')
+      .select(ANNOUNCEMENT_SELECT)
+      .order('pinned', { ascending: false })
+      .order('created_at', { ascending: false })
+      .limit(100);
+    if (options?.status) query = query.eq('status', options.status);
+    const rows = camel(asArray(
+      unwrap(await query, 'The announcement list could not be loaded.'),
+    )) as Announcement[];
+    return envelope(rows);
+  },
+
+  async compose(data: {
+    title: string;
+    body: string;
+    audience: AnnouncementAudience;
+    pinned?: boolean;
+    expiresAt?: string | null;
+  }) {
+    const userId = await getCurrentUserId();
+    const row = unwrap(
+      await supabase
+        .from('announcements')
+        .insert({ ...announcementInput(data), author_id: userId })
+        .select(ANNOUNCEMENT_SELECT)
+        .single(),
+      'The draft could not be saved.',
+    );
+    return envelope(camel(row) as Announcement);
+  },
+
+  async edit(id: string, data: {
+    title: string;
+    body: string;
+    audience: AnnouncementAudience;
+    pinned?: boolean;
+    expiresAt?: string | null;
+  }) {
+    if (!id) throw new ServiceError('Select the notice to change.');
+    const row = unwrap(
+      await supabase
+        .from('announcements')
+        .update(announcementInput(data))
+        .eq('id', id)
+        .select(ANNOUNCEMENT_SELECT)
+        .maybeSingle(),
+      'The notice could not be saved.',
+    );
+    if (!row) throw new ServiceError('That notice is no longer here.');
+    return envelope(camel(row) as Announcement);
+  },
+
+  /**
+   * Writes the bell rows, and the mail rows when asked. `notified` and
+   * `emailsQueued` are what the composer reports back, so the administrator
+   * learns the size of the audience before the worker has sent anything.
+   */
+  async publish(id: string, sendEmail: boolean) {
+    if (!id) throw new ServiceError('Select the notice to publish.');
+    const result = unwrap<any>(
+      await supabase.rpc('publish_announcement', { p_announcement_id: id, p_send_email: sendEmail }),
+      'The announcement could not be published.',
+    );
+    if (!result) throw new ServiceError('That notice is no longer here.');
+    return envelope({
+      id: String(result.id),
+      status: result.status as AnnouncementStatus,
+      publishedAt: result.publishedAt,
+      notified: Number(result.notified ?? 0),
+      emailsQueued: Number(result.emailsQueued ?? 0),
+    });
+  },
+
+  /** Back to the office shelf: nobody outside an administrator can read it. */
+  async withdraw(id: string) {
+    if (!id) throw new ServiceError('Select the notice to withdraw.');
+    const row = unwrap(
+      await supabase
+        .from('announcements')
+        .update({ status: 'DRAFT', published_at: null })
+        .eq('id', id)
+        .select(ANNOUNCEMENT_SELECT)
+        .maybeSingle(),
+      'The notice could not be withdrawn.',
+    );
+    if (!row) throw new ServiceError('That notice is no longer here.');
+    return envelope(camel(row) as Announcement);
+  },
+
+  async remove(id: string) {
+    if (!id) throw new ServiceError('Select the notice to delete.');
+    unwrap(await supabase.from('announcements').delete().eq('id', id), 'The notice could not be deleted.');
+    return { data: { success: true } };
+  },
+
+  /** Who the notice would reach, from the school's own register. */
+  async recipients(id: string) {
+    if (!id) throw new ServiceError('Select a notice.');
+    const rows = camel(asArray(
+      unwrap(
+        await supabase.rpc('announcement_recipients', { p_announcement_id: id }),
+        'The audience could not be read.',
+      ),
+    ));
+    return envelope(rows as Array<{ id: string; email: string; fullName: string }>);
+  },
+
+  /** Counts, not addresses: what the mail log says about one notice. */
+  async deliverySummary(id: string) {
+    if (!id) throw new ServiceError('Select a notice.');
+    const result = unwrap<any>(
+      await supabase.rpc('announcement_delivery_summary', { p_announcement_id: id }),
+      'The delivery report could not be read.',
+    );
+    const emails: Record<string, number> = {};
+    Object.entries(result?.emails ?? {}).forEach(([status, count]) => { emails[status] = Number(count); });
+    return envelope({
+      emails,
+      readBy: Number(result?.readBy ?? 0),
+      audience: Number(result?.audience ?? 0),
+    } as DeliverySummary);
+  },
+
+  async markRead(id?: string) {
+    const count = unwrap<number>(
+      await supabase.rpc('mark_announcements_read', { p_announcement_id: id ?? null }),
+      'The notice could not be marked as read.',
+    );
+    return envelope(Number(count ?? 0));
+  },
+};
+
+export const guardianService = {
+  /** One call for the whole roster page, so the table stays a single fetch. */
+  async forStudents(studentIds: string[]) {
+    if (!studentIds.length) return envelope([] as GuardianLink[]);
+    const rows = camel(asArray(
+      unwrap(
+        await supabase
+          .from('student_guardians')
+          .select(GUARDIAN_SELECT)
+          .in('student_id', studentIds)
+          .order('created_at', { ascending: true }),
+        'The guardian links could not be loaded.',
+      ),
+    ));
+    return envelope(rows as GuardianLink[]);
+  },
+
+  async link(studentId: string, guardianEmail: string, relationship: string) {
+    if (!studentId) throw new ServiceError('Select the student.');
+    if (!guardianEmail.trim()) throw new ServiceError('Enter the parent’s email address.');
+    const row = unwrap(
+      await supabase.rpc('link_guardian', {
+        p_student_id: studentId,
+        p_guardian_email: guardianEmail.trim(),
+        p_relationship: relationship.trim() || 'Guardian',
+      }),
+      'The parent could not be linked to this student.',
+    );
+    return envelope(camel(row) as GuardianLink);
+  },
+
+  /**
+   * The office creates a parent account before linking it, so a typo in an
+   * address shows up as a link failure rather than a family that never hears
+   * from the school.
+   */
+  async createParent(firstName: string, lastName: string, email: string) {
+    const id = unwrap(
+      await supabase.rpc('create_school_user', {
+        p_first_name: firstName.trim(),
+        p_last_name: lastName.trim(),
+        p_email: email.trim(),
+        p_role: 'PARENT',
+      }),
+      'The parent account could not be created.',
+    );
+    return envelope({ id, firstName: firstName.trim(), lastName: lastName.trim(), email: email.trim() });
+  },
+
+  async unlink(linkId: string) {
+    if (!linkId) throw new ServiceError('Select the link to remove.');
+    unwrap(await supabase.rpc('unlink_guardian', { p_link_id: linkId }), 'The link could not be removed.');
+    return { data: { success: true } };
+  },
+
+  /** A parent's own view: the children whose notices they are meant to receive. */
+  async myChildren() {
+    const userId = await getCurrentUserId();
+    const rows = camel(asArray(
+      unwrap(
+        await supabase
+          .from('student_guardians')
+          .select('id, student_id, guardian_id, relationship, created_at, student:profiles!student_guardians_student_id_fkey(id, first_name, last_name, email, matric_number, student_level, student_status)')
+          .eq('guardian_id', userId)
+          .order('created_at', { ascending: true }),
+        'Your children could not be loaded.',
+      ),
+    ));
+    return envelope(rows as GuardianLink[]);
   },
 };
 

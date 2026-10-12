@@ -6,7 +6,10 @@ import tseslint from 'typescript-eslint'
 import { defineConfig, globalIgnores } from 'eslint/config'
 
 export default defineConfig([
-  globalIgnores(['dist']),
+  // The Edge Functions under supabase/functions run on Deno with `Deno.serve`,
+  // so the browser globals and module resolution configured below would only
+  // produce false errors for them.
+  globalIgnores(['dist', 'supabase/functions']),
   {
     files: ['**/*.{ts,tsx}'],
     extends: [

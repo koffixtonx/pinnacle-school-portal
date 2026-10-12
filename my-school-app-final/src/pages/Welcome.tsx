@@ -20,6 +20,9 @@ const getDashboardPath = (role?: string) => {
   if (role === 'SUPER_ADMIN' || role === 'SCHOOL_ADMIN') return '/dashboard';
   if (role === 'TEACHER') return '/teacher-dashboard';
   if (role === 'STUDENT') return '/student-dashboard';
+  // A parent has no dashboard of their own; the notices addressed to them are
+  // the closest thing to one, and it is the page the school actually fills for them.
+  if (role === 'PARENT') return '/announcements';
   return null;
 };
 

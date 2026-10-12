@@ -31,6 +31,7 @@ import PasswordIcon from '@mui/icons-material/Password';
 import BugReportIcon from '@mui/icons-material/BugReport';
 import HelpIcon from '@mui/icons-material/Help';
 import { authService } from '../services/api.service';
+import TwoFactorCard from '../components/TwoFactorCard';
 import { useCurrentUser } from '../hooks/useCurrentUser';
 
 const Settings: React.FC = () => {
@@ -67,7 +68,6 @@ const Settings: React.FC = () => {
     smsNotifications: false,
     announcements: true,
     weeklyReports: true,
-    twoFactorAuth: false,
     darkMode: false,
   });
 
@@ -243,19 +243,11 @@ const Settings: React.FC = () => {
                   startIcon={<PasswordIcon />}
                   fullWidth
                   onClick={openPasswordDialog}
-                  sx={{ mb: 1 }}
+                  sx={{ mb: 2 }}
                 >
                   Change Password
                 </Button>
-                <FormControlLabel
-                  control={
-                    <Switch
-                      checked={settings.twoFactorAuth}
-                      onChange={() => handleSettingChange('twoFactorAuth')}
-                    />
-                  }
-                  label="Enable Two-Factor Authentication"
-                />
+                <TwoFactorCard />
               </Box>
 
               <Divider sx={{ my: 2 }} />

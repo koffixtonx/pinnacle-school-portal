@@ -45,11 +45,12 @@ interface CourseRow {
   code: string;
   description: string;
   level?: string;
+  creditUnits?: number;
   teachers: Teacher[];
   _count: { enrollments: number };
 }
 
-const emptyForm = { title: '', code: '', description: '', level: '100', teacherIds: [] as string[] };
+const emptyForm = { title: '', code: '', description: '', level: '100', creditUnits: '3', teacherIds: [] as string[] };
 
 const Courses: React.FC = () => {
   const user = useCurrentUser();
@@ -109,6 +110,7 @@ const Courses: React.FC = () => {
       code: course.code,
       description: course.description,
       level: course.level ?? '100',
+      creditUnits: String(course.creditUnits ?? 3),
       teacherIds: course.teachers.map((t) => t.id),
     });
     setDialogOpen(true);
@@ -119,10 +121,24 @@ const Courses: React.FC = () => {
       setLoading(true);
       setError('');
       if (editingId) {
-        await academicsService.updateCourse(editingId, form);
+        await academicsService.updateCourse(editingId, {
+          title: form.title,
+          code: form.code,
+          description: form.description,
+          level: form.level,
+          creditUnits: Number(form.creditUnits),
+          teacherIds: form.teacherIds,
+        });
         showSuccess('Course updated');
       } else {
-        await academicsService.createCourse(form.title, form.code, form.description, form.teacherIds, form.level);
+        await academicsService.createCourse(
+          form.title,
+          form.code,
+          form.description,
+          form.teacherIds,
+          form.level,
+          Number(form.creditUnits),
+        );
         showSuccess('Course created');
       }
       setDialogOpen(false);
@@ -189,6 +205,7 @@ const Courses: React.FC = () => {
                   <Typography variant="h6">{course.title}</Typography>
                   <Box sx={{ display: 'flex', gap: 0.5, flexWrap: 'wrap', justifyContent: 'flex-end' }}>
                     <Chip label={`${course.level ?? '100'} Level`} size="small" color="primary" />
+                    <Chip label={`${course.creditUnits ?? 3} units`} size="small" variant="outlined" />
                     <Chip label={course.code} size="small" variant="outlined" />
                   </Box>
                 </Box>
@@ -272,6 +289,16 @@ const Courses: React.FC = () => {
             ))}
           </TextField>
           <TextField
+            label="Credit units"
+            type="number"
+            fullWidth
+            margin="normal"
+            helperText="Whole number from 1 to 24. Counts towards the semester credit load."
+            slotProps={{ input: { inputProps: { min: 1, max: 24, step: 1 } } }}
+            value={form.creditUnits}
+            onChange={(e) => setForm({ ...form, creditUnits: e.target.value })}
+          />
+          <TextField
             select
              slotProps={{ select: { multiple: true } }}
             label="Teachers"
@@ -293,7 +320,11 @@ const Courses: React.FC = () => {
         </DialogContent>
         <DialogActions>
           <Button onClick={() => setDialogOpen(false)}>Cancel</Button>
-          <Button variant="contained" onClick={handleSave} disabled={!form.title || !form.code}>
+          <Button
+            variant="contained"
+            onClick={handleSave}
+            disabled={!form.title || !form.code || !Number.isInteger(Number(form.creditUnits))}
+          >
             Save
           </Button>
         </DialogActions>

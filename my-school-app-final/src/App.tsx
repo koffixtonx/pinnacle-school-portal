@@ -25,6 +25,15 @@ const Grades = React.lazy(() => import('./pages/Grades'));
 const Fees = React.lazy(() => import('./pages/Fees'));
 const Departments = React.lazy(() => import('./pages/Departments'));
 const CourseCatalog = React.lazy(() => import('./pages/CourseCatalog'));
+const AcademicCalendar = React.lazy(() => import('./pages/AcademicCalendar'));
+const CourseRegistration = React.lazy(() => import('./pages/CourseRegistration'));
+const CourseRegistrationReview = React.lazy(() => import('./pages/CourseRegistrationReview'));
+const Announcements = React.lazy(() => import('./pages/Announcements'));
+const AnnouncementReview = React.lazy(() => import('./pages/AnnouncementReview'));
+const Results = React.lazy(() => import('./pages/Results'));
+const ForgotPassword = React.lazy(() => import('./pages/ForgotPassword'));
+const ResetPassword = React.lazy(() => import('./pages/ResetPassword'));
+const VerifyTotp = React.lazy(() => import('./pages/VerifyTotp'));
 
 // Protected Route Component: requires login, and (if roles is given) requires
 // the current user's role to be one of the allowed roles.
@@ -67,6 +76,34 @@ function App() {
 
   const [siteSettings, setSiteSettings] = React.useState<any>(null);
 
+  // A student with a confirmed authenticator must prove it before the portal
+  // opens. The answer comes from GoTrue (`auth.mfa`), never from a column we
+  // keep ourselves, so it cannot drift from what the auth server believes.
+  const [needsSecondFactor, setNeedsSecondFactor] = React.useState<boolean | null>(null);
+  React.useEffect(() => {
+    if (!isAuthenticated) {
+      setNeedsSecondFactor(null);
+      return;
+    }
+    let cancelled = false;
+    const check = async () => {
+      try {
+        const service = await import('./services/api.service');
+        const status = await service.mfaService.status();
+        const verified = status.data.data.enrolled ? await service.mfaService.isVerified() : true;
+        if (!cancelled) setNeedsSecondFactor(status.data.data.enrolled && !verified);
+      } catch {
+        // A failure to read the factor list must not lock anyone out of a portal
+        // they are already signed into; it also must not pretend the check
+        // passed silently, so it is logged.
+        console.error('Two-factor status unavailable');
+        if (!cancelled) setNeedsSecondFactor(false);
+      }
+    };
+    void check();
+    return () => { cancelled = true; };
+  }, [isAuthenticated]);
+
   // load site settings (public or protected) and listen for updates
   React.useEffect(() => {
     let mounted = true;
@@ -101,13 +138,29 @@ function App() {
   return (
     <ThemeProvider theme={themeWithOverrides}>
       <BrowserRouter>
-        {isAuthenticated ? (
+        {/* Signed in but the factor check has not answered yet (null) or has not
+            cleared (true): neither state may show the portal's pages. */}
+        {isAuthenticated && needsSecondFactor !== false ? (
+          needsSecondFactor === null ? (
+            <PageFallback />
+          ) : (
+            <React.Suspense fallback={<PageFallback />}>
+              <Routes>
+                <Route path="*" element={<VerifyTotp onVerified={() => setNeedsSecondFactor(false)} />} />
+              </Routes>
+            </React.Suspense>
+          )
+        ) : isAuthenticated ? (
           <DrawerAppBar mode={mode} onToggleColorMode={toggleColorMode}>
             <React.Suspense fallback={<PageFallback />}>
               <Routes>
               <Route path="/" element={<Welcome />} />
               <Route path="/login" element={<Navigate to="/" replace />} />
               <Route path="/register" element={<Navigate to="/" replace />} />
+              {/* A reset link opened while already signed in still has to land
+                  somewhere; the page refuses to change a password without the
+                  code it was sent with. */}
+              <Route path="/reset-password" element={<ResetPassword />} />
               <Route
                 path="/dashboard"
                 element={
@@ -176,10 +229,53 @@ function App() {
                 }
               />
               <Route
+                path="/academic-calendar"
+                element={
+                  <ProtectedRoute roles={['SUPER_ADMIN', 'SCHOOL_ADMIN']}>
+                    <AcademicCalendar />
+                  </ProtectedRoute>
+                }
+              />
+              <Route
+                path="/course-registration"
+                element={
+                  <ProtectedRoute roles={['STUDENT']}>
+                    <CourseRegistration />
+                  </ProtectedRoute>
+                }
+              />
+              <Route
+                path="/course-registration-review"
+                element={
+                  <ProtectedRoute roles={['SUPER_ADMIN', 'SCHOOL_ADMIN']}>
+                    <CourseRegistrationReview />
+                  </ProtectedRoute>
+                }
+              />
+              <Route
+                path="/results"
+                element={
+                  <ProtectedRoute roles={['STUDENT']}>
+                    <Results />
+                  </ProtectedRoute>
+                }
+              />
+              <Route
                 path="/fees"
                 element={
                   <ProtectedRoute roles={['SUPER_ADMIN', 'SCHOOL_ADMIN', 'STUDENT']}>
                     <Fees />
+                  </ProtectedRoute>
+                }
+              />
+              {/* Every signed-in person has an audience of their own, parents
+                  included, so the feed is open to the whole portal. */}
+              <Route path="/announcements" element={<Announcements />} />
+              <Route
+                path="/announcement-review"
+                element={
+                  <ProtectedRoute roles={['SUPER_ADMIN', 'SCHOOL_ADMIN']}>
+                    <AnnouncementReview />
                   </ProtectedRoute>
                 }
               />
@@ -202,6 +298,8 @@ function App() {
             <Route path="/" element={<Home />} />
             <Route path="/login" element={<Login />} />
             <Route path="/register" element={<Register />} />
+            <Route path="/forgot-password" element={<ForgotPassword />} />
+            <Route path="/reset-password" element={<ResetPassword />} />
             <Route path="*" element={<Navigate to="/login" replace />} />
             </Routes>
           </React.Suspense>
