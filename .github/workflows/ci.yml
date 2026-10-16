@@ -1,9 +1,18 @@
 name: CI
 
+# The repository root also holds `legacy-express-backend/` and a release zip, so
+# every path in this file is qualified with the app directory. GitHub only reads
+# workflows from `.github/workflows/` at the *repository root* — a copy nested
+# inside the app folder is never discovered, which is why an earlier commit of
+# this file produced zero runs.
 on:
   push:
     branches: [main]
   pull_request:
+
+defaults:
+  run:
+    working-directory: my-school-app-final
 
 jobs:
   web:
@@ -14,6 +23,8 @@ jobs:
         with:
           node-version: 22
           cache: npm
+          # setup-node looks for the lockfile at the repo root by default.
+          cache-dependency-path: my-school-app-final/package-lock.json
       - run: npm ci
       - run: npm run lint
       - run: npm test
@@ -24,8 +35,9 @@ jobs:
         if: failure()
         with:
           name: vitest-and-build
+          # Action inputs are not affected by defaults.run.working-directory.
           path: |
-            test-results
+            my-school-app-final/test-results
             npm-debug.log
           retention-days: 5
 
@@ -55,7 +67,8 @@ jobs:
       - run: sh supabase/tests/local/apply.sh 2>&1 | tee /tmp/rls.log
       # apply.sh stops on the first SQL error, but a suite that stopped emitting
       # its summary line would look like a clean run. Pin the counted assertions.
-      - run: grep -E 'assertions: [0-9]+ +failed: 0' /tmp/rls.log
+      # Double-quoted: an unquoted `: ` in this pattern is not valid YAML.
+      - run: "grep -E 'assertions: [0-9]+ +failed: 0' /tmp/rls.log"
       - uses: actions/upload-artifact@v4
         if: failure()
         with:
@@ -79,6 +92,7 @@ jobs:
         with:
           node-version: 22
           cache: npm
+          cache-dependency-path: my-school-app-final/package-lock.json
       - run: npm ci
       - run: npx playwright install --with-deps chromium
       - run: npm run build
@@ -88,6 +102,6 @@ jobs:
         with:
           name: playwright
           path: |
-            playwright-report
-            test-results
+            my-school-app-final/playwright-report
+            my-school-app-final/test-results
           retention-days: 5

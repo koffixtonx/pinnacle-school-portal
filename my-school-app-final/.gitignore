@@ -38,3 +38,7 @@ my-school-app-final.zip
 # supabase/ rather than the repository root. Migrations are applied from the SQL
 # editor, so nothing in it is used by this project.
 /supabase/supabase/
+
+# Same for the branch marker a Supabase MCP/CLI session drops next to the
+# migrations: it records which hosted branch the tool last pointed at.
+/supabase/.branches/

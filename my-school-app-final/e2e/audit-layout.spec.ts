@@ -21,7 +21,10 @@ test.describe('audit log filter bar', () => {
     await signInAsAdmin(page);
     await page.goto('/audit-log');
     await expect(page.locator(AUDIT_FIELDS[0])).toBeVisible();
-    await expect(page.locator('.MuiSkeleton-root')).toHaveCount(0);
+    // The rows come from the live project, so the loading skeletons can outlast
+    // the 5s default expect timeout on a slow response — and this suite is serial,
+    // so one timeout there aborts the three specs after it too.
+    await expect(page.locator('.MuiSkeleton-root')).toHaveCount(0, { timeout: 30_000 });
   });
 
   test('every field is one height and the four labels sit inside their borders', async ({ page }) => {

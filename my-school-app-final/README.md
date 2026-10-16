@@ -54,12 +54,13 @@ my-school-app-final/
 │   ├── App.tsx                # Routes and protected routes
 │   └── main.tsx
 ├── e2e/                       # Playwright specs against the built bundle
-├── .github/workflows/ci.yml   # lint, unit, RLS, and an opt-in browser job
 ├── .env.example               # Supabase keys, plus an optional Sentry DSN
 └── HOSTING.md                 # Deployment and pre-launch checklist
 ```
 
 The retired server lives in `../legacy-express-backend/`, a sibling of this folder.
+So does CI: `../.github/workflows/ci.yml`. It has to sit at the repository root, because
+GitHub discovers workflows only there — a workflow inside this folder is never picked up.
 
 ## Prerequisites
 
@@ -187,7 +188,8 @@ administrator's profile.
 
 ## Tests
 
-Three suites, run in CI (`.github/workflows/ci.yml`) on every push and pull request:
+Three suites, run in CI (`../.github/workflows/ci.yml`, at the repository root) on every push and
+pull request:
 
 | Command | Suite | Needs |
 | --- | --- | --- |
