@@ -1,0 +1,93 @@
+name: CI
+
+on:
+  push:
+    branches: [main]
+  pull_request:
+
+jobs:
+  web:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+          cache: npm
+      - run: npm ci
+      - run: npm run lint
+      - run: npm test
+      # The build is the type check: `npm run build` runs tsc -b first, and that
+      # is what catches a page calling the service layer with the wrong shape.
+      - run: npm run build
+      - uses: actions/upload-artifact@v4
+        if: failure()
+        with:
+          name: vitest-and-build
+          path: |
+            test-results
+            npm-debug.log
+          retention-days: 5
+
+  rls:
+    # The policies are the security model, so they run here rather than only on a
+    # laptop: every migration is applied twice and then asserted per persona.
+    runs-on: ubuntu-latest
+    services:
+      postgres:
+        image: postgres:18
+        env:
+          POSTGRES_PASSWORD: ci-only-password
+        ports: ['5432:5432']
+        options: >-
+          --health-cmd "pg_isready -U postgres"
+          --health-interval 5s
+          --health-timeout 5s
+          --health-retries 10
+    env:
+      PGHOST: localhost
+      PGPORT: '5432'
+      PGUSER: postgres
+      PGPASSWORD: ci-only-password
+    steps:
+      - uses: actions/checkout@v4
+      - run: command -v psql >/dev/null || { sudo apt-get update && sudo apt-get install -y postgresql-client; }
+      - run: sh supabase/tests/local/apply.sh 2>&1 | tee /tmp/rls.log
+      # apply.sh stops on the first SQL error, but a suite that stopped emitting
+      # its summary line would look like a clean run. Pin the counted assertions.
+      - run: grep -E 'assertions: [0-9]+ +failed: 0' /tmp/rls.log
+      - uses: actions/upload-artifact@v4
+        if: failure()
+        with:
+          name: rls-output
+          path: /tmp/rls.log
+          retention-days: 5
+
+  browser:
+    # Needs a real project to sign in to, so it stays off until both the public
+    # build variables and the QA credential exist.
+    if: ${{ vars.RUN_E2E == 'true' }}
+    needs: web
+    runs-on: ubuntu-latest
+    env:
+      VITE_SUPABASE_URL: ${{ vars.VITE_SUPABASE_URL }}
+      VITE_SUPABASE_ANON_KEY: ${{ vars.VITE_SUPABASE_ANON_KEY }}
+      E2E_ADMIN_SECRET: ${{ secrets.E2E_ADMIN_SECRET }}
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+          cache: npm
+      - run: npm ci
+      - run: npx playwright install --with-deps chromium
+      - run: npm run build
+      - run: npm run test:e2e
+      - uses: actions/upload-artifact@v4
+        if: ${{ !cancelled() }}
+        with:
+          name: playwright
+          path: |
+            playwright-report
+            test-results
+          retention-days: 5

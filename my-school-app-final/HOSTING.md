@@ -56,11 +56,12 @@ actually exercised rather than assumed.
 
 ## Environment variables
 
-Only two, both public:
+Two required, both public, and one optional:
 
 ```env
 VITE_SUPABASE_URL=https://YOUR-PROJECT-REF.supabase.co
 VITE_SUPABASE_ANON_KEY=sb_publishable_…      # or a legacy anon JWT, starting "eyJ"
+VITE_SENTRY_DSN=https://examplePublicKey@o0.ingest.sentry.io/0   # optional
 ```
 
 A publishable or anon key is safe to ship in the browser bundle because it only ever grants what
@@ -73,6 +74,16 @@ from the client.
 
 Vite inlines these values when it builds, so changing a project URL or key requires a new
 deployment, not a restart.
+
+### Error reporting
+
+`VITE_SENTRY_DSN` is optional, and `src/services/monitoring.ts` stays inert without it: no SDK
+initialises and nothing leaves the page. With a DSN set, unhandled errors and anything the root
+`ErrorBoundary` catches are sent, tagged with the signed-in account's auth `user_id` and role so a
+crash can be traced to one person's session. No names, email addresses, grades or fee amounts are
+attached — the payload is the stack, the message, and those two fields. A DSN is write-only (it can
+send events, never read them), which is why it can be inlined at all; treat it like the publishable
+key and keep it in the host's settings rather than committed to a public repository.
 
 ## Frontend hosting
 
@@ -133,11 +144,14 @@ write policy is unscoped - but if that exposure matters, give each school its ow
 
 ## Pre-launch checklist
 
+- [ ] CI green on the release commit: lint, `npm test`, the RLS suite, and `npm run build`
 - [ ] Migrations `0001`–`0005` applied to the production project, from a tagged release rather
       than ad-hoc edits in the dashboard
 - [ ] Production origin added to Site URL and Redirect URLs
 - [ ] `VITE_SUPABASE_URL` / `VITE_SUPABASE_ANON_KEY` set in the host; `service_role` key and DB
       password set nowhere in the frontend
+- [ ] `VITE_SENTRY_DSN` set (or deliberately unset, so crashes go nowhere rather than to a stale
+      project). Trigger one: load a deep route with the network offline
 - [ ] SPA fallback verified: reload a deep route such as `/settings`
 - [ ] Admin upload of a logo and a welcome background renders from Storage
 - [ ] A `STUDENT` token cannot read another student's row — try it in the SQL editor or via the

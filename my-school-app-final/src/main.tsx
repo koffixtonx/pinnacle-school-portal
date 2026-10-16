@@ -1,7 +1,12 @@
 import { StrictMode } from 'react'
 import { createRoot } from 'react-dom/client'
 import './index.css'
+import ErrorBoundary, { FatalScreen } from './components/ErrorBoundary'
+import { initMonitoring, reportError } from './services/monitoring'
 import { SUPABASE_CONFIG_ERROR } from './services/supabase-config'
+
+// Before the first render, so a crash during mount is reported and caught.
+initMonitoring()
 
 const root = createRoot(document.getElementById('root')!)
 
@@ -33,11 +38,20 @@ if (SUPABASE_CONFIG_ERROR) {
     </div>,
   )
 } else {
-  void import('./App.tsx').then(({ default: App }) => {
-    root.render(
-      <StrictMode>
-        <App />
-      </StrictMode>,
-    )
-  })
+  void import('./App.tsx')
+    .then(({ default: App }) => {
+      root.render(
+        <StrictMode>
+          <ErrorBoundary>
+            <App />
+          </ErrorBoundary>
+        </StrictMode>,
+      )
+    })
+    .catch((error: unknown) => {
+      // A chunk that 404s after a redeploy rejects this import instead of
+      // throwing during render, so ErrorBoundary below never sees it.
+      reportError(error)
+      root.render(<FatalScreen error={error} />)
+    })
 }

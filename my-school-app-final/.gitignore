@@ -28,3 +28,13 @@ dist-ssr
 *.sln
 *.sw?
 my-school-app-final.zip
+
+# Test output
+/test-results/
+/playwright-report/
+/blob-report/
+
+# The Supabase CLI writes its own project folder here when it is run from inside
+# supabase/ rather than the repository root. Migrations are applied from the SQL
+# editor, so nothing in it is used by this project.
+/supabase/supabase/

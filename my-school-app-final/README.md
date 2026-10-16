@@ -44,15 +44,18 @@ my-school-app-final/
 │   └── tests/local/           # Supabase shim + RLS assertions (never deployed)
 ├── src/
 │   ├── pages/                 # One component per route
-│   ├── components/            # DrawerAppBar and shared UI
+│   ├── components/            # DrawerAppBar, shared UI, ErrorBoundary
 │   ├── hooks/useCurrentUser.ts
 │   ├── services/
 │   │   ├── api.ts             # Supabase client, error and row-shape helpers
+│   │   ├── monitoring.ts      # Sentry init, inert without VITE_SENTRY_DSN
 │   │   └── api.service.ts     # The typed data layer every page calls
 │   ├── theme/                 # MUI theme factory
 │   ├── App.tsx                # Routes and protected routes
 │   └── main.tsx
-├── .env.example               # VITE_SUPABASE_URL / VITE_SUPABASE_ANON_KEY
+├── e2e/                       # Playwright specs against the built bundle
+├── .github/workflows/ci.yml   # lint, unit, RLS, and an opt-in browser job
+├── .env.example               # Supabase keys, plus an optional Sentry DSN
 └── HOSTING.md                 # Deployment and pre-launch checklist
 ```
 
@@ -94,6 +97,10 @@ Fill `.env.local` with the values from **Project Settings → API Keys**:
 VITE_SUPABASE_URL=https://YOUR-PROJECT-REF.supabase.co
 VITE_SUPABASE_ANON_KEY=sb_publishable_…
 ```
+
+Error reporting is off until you add a client DSN: `VITE_SENTRY_DSN=https://…@o0.ingest.sentry.io/0`
+sends crashes (stack, the account's auth id and role — never grades or fees) to Sentry. See
+`HOSTING.md` for what that payload contains.
 
 Both values ship inside the browser bundle and are public by design — the publishable key (or a
 legacy `anon public` JWT, which also fits in that variable) only grants whatever Row Level Security
@@ -177,6 +184,34 @@ Rows store the `bucket/object` path, and `resolveAssetUrl()` builds the public U
 
 Only a `SUPER_ADMIN` may change roles, delete a tenant's branding, or edit another
 administrator's profile.
+
+## Tests
+
+Three suites, run in CI (`.github/workflows/ci.yml`) on every push and pull request:
+
+| Command | Suite | Needs |
+| --- | --- | --- |
+| `npm test` | Vitest components and helpers, under `src/**/*.test.tsx?` next to the code | nothing — the service layer is mocked |
+| `sh supabase/tests/local/apply.sh` | Every migration applied twice, then the per-role RLS assertions | a throwaway Postgres, see below |
+| `npm run test:e2e` | Playwright pages in a real browser, under `e2e/` | a built `dist/` and, for the signed-in specs, a live project |
+
+The Postgres suite is the one that guards the security model; it never touches a hosted
+project. `apply.sh` expects a server already listening — the local recipe is documented in
+`supabase/tests/local/README.md`, and CI starts `postgres:18` as a service container.
+
+Playwright builds nothing itself: run `npm run build` first, or set `E2E_BASE_URL` to aim the specs
+at a deployed site instead of serving `dist/` locally. The anonymous-visitor and crash specs need no
+credentials. The audit-log layout specs sign in as the QA administrator — their password is never
+committed, so they stay skipped until you pass it, against a build that was given real
+`VITE_SUPABASE_*` variables:
+
+```bash
+npm run build
+E2E_ADMIN_SECRET='…' E2E_CHROMIUM=/path/to/chromium npm run test:e2e
+```
+
+`E2E_CHROMIUM` is only needed where Playwright's own browser download is unavailable. The CI browser
+job stays off until `RUN_E2E` is set as a repository variable alongside that secret.
 
 ## Deployment
 
