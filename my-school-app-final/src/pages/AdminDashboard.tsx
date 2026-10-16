@@ -40,6 +40,7 @@ import { useNavigate } from 'react-router-dom';
 import MenuIcon from '@mui/icons-material/Menu';
 import CloseIcon from '@mui/icons-material/Close';
 import SettingsIcon from '@mui/icons-material/Settings';
+import HistoryIcon from '@mui/icons-material/History';
 import { BarChart, Bar, XAxis, YAxis, Tooltip, Legend, ResponsiveContainer, LineChart, Line, AreaChart, Area } from 'recharts';
 import { adminService, notificationsService, siteSettingsService } from '../services/api.service';
 import { useCurrentUser } from '../hooks/useCurrentUser';
@@ -52,16 +53,6 @@ interface Student {
   email: string;
   active: boolean;
   createdAt: string;
-}
-
-interface AuditLogEntry {
-  id: string;
-  action: string;
-  entity: string;
-  entityId: string;
-  summary: string;
-  createdAt: string;
-  actorId: string | null;
 }
 
 interface EnrollmentAnalytics {
@@ -85,7 +76,7 @@ interface MetricCardProps {
   accent: string;
 }
 
-const TABS = ['overview', 'students', 'audit'] as const;
+const TABS = ['overview', 'students'] as const;
 type Tab = (typeof TABS)[number];
 
 const formatDate = (value: string) =>
@@ -139,10 +130,6 @@ const AdminDashboard: React.FC = () => {
   const [importing, setImporting] = useState(false);
   const [searchTerm, setSearchTerm] = useState('');
 
-  const [logs, setLogs] = useState<AuditLogEntry[]>([]);
-  const [logsCursor, setLogsCursor] = useState<string | null>(null);
-  const [logsLoaded, setLogsLoaded] = useState(false);
-  const [auditSearchTerm, setAuditSearchTerm] = useState('');
   const [reportPeriod, setReportPeriod] = useState<'current' | 'previous' | 'year' >('current');
 
   const showSuccess = (message: string) => {
@@ -185,30 +172,12 @@ const AdminDashboard: React.FC = () => {
     }
   };
 
-  const fetchLogs = async (cursor?: string | null) => {
-    try {
-      setLoading(true);
-      setError('');
-      const response = await adminService.getAuditLogs({ limit: 25, cursor: cursor ?? undefined });
-      setLogs((prev) => (cursor ? [...prev, ...response.data.data] : response.data.data));
-      setLogsCursor(response.data.paging.nextCursor);
-      setLogsLoaded(true);
-    } catch (err: any) {
-      setError(err.response?.data?.message || 'Failed to load audit logs');
-    } finally {
-      setLoading(false);
-    }
-  };
-
   useEffect(() => {
     if (activeTab === 'overview' && !overviewLoaded) {
       void fetchOverview();
     }
     if (activeTab === 'students' && !studentsLoaded) {
       void fetchStudents();
-    }
-    if (activeTab === 'audit' && !logsLoaded) {
-      void fetchLogs();
     }
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [activeTab]);
@@ -282,14 +251,6 @@ const AdminDashboard: React.FC = () => {
     );
   }, [searchTerm, students]);
 
-  const filteredLogs = useMemo(() => {
-    const query = auditSearchTerm.toLowerCase();
-    if (!query) return logs;
-    return logs.filter((log) =>
-      `${log.action} ${log.entity} ${log.summary}`.toLowerCase().includes(query),
-    );
-  }, [auditSearchTerm, logs]);
-
   const handleBulkImport = async () => {
     const lines = importText
       .split('\n')
@@ -329,9 +290,6 @@ const AdminDashboard: React.FC = () => {
     }
     if (activeTab === 'students') {
       await fetchStudents();
-    }
-    if (activeTab === 'audit') {
-      await fetchLogs();
     }
   };
 
@@ -437,7 +395,7 @@ const AdminDashboard: React.FC = () => {
                 Dashboard navigation
               </Typography>
               <Typography variant="body2" color="text.secondary">
-                Switch between overview, learners, and audit history as needed.
+                Switch between overview and learners, or open the audit log for the full change history.
               </Typography>
             </Box>
             <Stack direction={{ xs: 'column', sm: 'row' }} spacing={1.5}>
@@ -451,6 +409,14 @@ const AdminDashboard: React.FC = () => {
                   {tab}
                 </Button>
               ))}
+              <Button
+                variant="outlined"
+                startIcon={<HistoryIcon />}
+                onClick={() => navigate('/audit-log')}
+                sx={{ minWidth: 120 }}
+              >
+                Audit log
+              </Button>
             </Stack>
           </Stack>
         </CardContent>
@@ -818,68 +784,6 @@ const AdminDashboard: React.FC = () => {
               </TableContainer>
               {studentsCursor && (
                 <Button variant="outlined" sx={{ mt: 2 }} onClick={() => void fetchStudents(studentsCursor)} disabled={loading}>
-                  Load more
-                </Button>
-              )}
-            </CardContent>
-          </Card>
-        </Box>
-      )}
-
-      {activeTab === 'audit' && (
-        <Box sx={{ display: 'grid', gap: 3 }}>
-          <Card sx={{ borderRadius: 3, border: '1px solid rgba(15, 23, 42, 0.08)' }}>
-            <CardContent>
-              <Stack direction={{ xs: 'column', sm: 'row' }} spacing={2} sx={{ mb: 2, justifyContent:  'space-between', alignItems: { xs: 'stretch', sm: 'center' } }}>
-                <Box>
-                  <Typography variant="h6" sx={{ fontWeight: 700 }}>
-                    Audit trail
-                  </Typography>
-                  <Typography variant="body2" color="text.secondary">
-                    Review recent changes and administrative actions.
-                  </Typography>
-                </Box>
-                <TextField
-                  size="small"
-                  placeholder="Search log entries"
-                  value={auditSearchTerm}
-                  onChange={(e) => setAuditSearchTerm(e.target.value)}
-                   slotProps={{ input: { startAdornment: <Search sx={{ mr: 1, color: 'text.secondary' }} /> } }}
-                />
-              </Stack>
-              <TableContainer sx={{ overflowX: 'auto' }}>
-                <Table>
-                  <TableHead>
-                    <TableRow>
-                      <TableCell>When</TableCell>
-                      <TableCell>Action</TableCell>
-                      <TableCell>Entity</TableCell>
-                      <TableCell>Summary</TableCell>
-                    </TableRow>
-                  </TableHead>
-                  <TableBody>
-                    {filteredLogs.map((log) => (
-                      <TableRow key={log.id}>
-                        <TableCell>{formatDate(log.createdAt)}</TableCell>
-                        <TableCell>{log.action}</TableCell>
-                        <TableCell>{log.entity}</TableCell>
-                        <TableCell>{log.summary}</TableCell>
-                      </TableRow>
-                    ))}
-                    {filteredLogs.length === 0 && !loading && (
-                      <TableRow>
-                        <TableCell colSpan={4}>
-                          <Typography variant="body2" color="text.secondary">
-                            No audit log entries match the current search.
-                          </Typography>
-                        </TableCell>
-                      </TableRow>
-                    )}
-                  </TableBody>
-                </Table>
-              </TableContainer>
-              {logsCursor && (
-                <Button variant="outlined" sx={{ mt: 2 }} onClick={() => void fetchLogs(logsCursor)} disabled={loading}>
                   Load more
                 </Button>
               )}

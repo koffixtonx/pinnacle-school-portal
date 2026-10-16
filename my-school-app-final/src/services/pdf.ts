@@ -39,6 +39,30 @@ const PAGE_STYLE = `
   .stat strong { display: block; font-size: 18px; }
   .stat span { font-size: 11px; text-transform: uppercase; letter-spacing: 0.6px; color: #5c7186; }
   footer { margin-top: 24px; padding-top: 12px; border-top: 1px solid #d7e0ea; font-size: 11px; color: #5c7186; }
+
+  /* CR80 is 85.6 x 54 mm; the sheet prints one card centred on the page so it can
+     be cut and laminated without a template. */
+  .idcard { width: 85.6mm; height: 54mm; border: 1px solid #b9c8d6; border-radius: 2.5mm;
+            padding: 2.5mm 3mm; box-sizing: border-box; display: flex; flex-direction: column;
+            margin: 0 auto; background: #fff; }
+  .idcard-head { display: flex; justify-content: space-between; align-items: baseline;
+                 border-bottom: 1.5pt solid #12355b; padding-bottom: 1mm; margin-bottom: 1.5mm; }
+  .idcard-head h1 { font-size: 11pt; margin: 0; letter-spacing: 0.2px; }
+  .idcard-head h2 { font-size: 7.5pt; margin: 0; }
+  .idcard-body { display: flex; gap: 3mm; flex: 1; min-height: 0; }
+  .idcard-photo { width: 16mm; height: 20mm; object-fit: cover; border: 1px solid #d7e0ea;
+                  background: #eef3f8; display: block; }
+  .idcard-photo-empty { width: 16mm; height: 20mm; border: 1px dashed #b9c8d6; display: flex;
+                        align-items: center; justify-content: center; color: #7c93a6; font-size: 14pt; }
+  .idcard-fields { flex: 1; min-width: 0; font-size: 8pt; }
+  .idcard-fields .field { margin-bottom: 0.6mm; }
+  .idcard-fields .field span { font-size: 6pt; }
+  .idcard-name { font-size: 10.5pt; font-weight: 700; margin-bottom: 1mm; }
+  .idcard-foot { display: flex; justify-content: space-between; align-items: center;
+                 font-size: 7pt; color: #5c7186; border-top: 1px solid #d7e0ea; padding-top: 1mm; }
+  .idcard-code { font-family: 'Courier New', monospace; font-size: 9pt; font-weight: 700; letter-spacing: 1pt; color: #12283f; }
+  .idcard.revoked { border-color: #b3261e; }
+  .idcard.revoked .idcard-name { color: #b3261e; }
   @page { margin: 16mm; }
 `;
 
@@ -268,6 +292,56 @@ export const documentService = {
           <tbody>${semesters || '<tr><td colspan="7">No published results yet.</td></tr>'}</tbody>
         </table>
         <footer>Grades are weighted by credit units on the school's published 5.0 scale. Generated ${new Date().toLocaleString()}.</footer>
+      </div>`,
+    );
+  },
+
+  printIdCard(options: {
+    school: string;
+    holder: Record<string, any>;
+    card: Record<string, any> | null;
+    photoUrl?: string | null;
+  }) {
+    const { holder, card } = options;
+    const name = `${holder.firstName ?? ''} ${holder.lastName ?? ''}`.trim() || 'Registered student';
+    const department = holder.department ?? '';
+    const faculty = holder.faculty ?? '';
+    const withdrawn = card?.status === 'REVOKED';
+    const initials = name
+      .split(/\s+/)
+      .map((part) => part[0] ?? '')
+      .join('')
+      .slice(0, 2)
+      .toUpperCase();
+
+    printHtml(
+      `Student ID card - ${name}`,
+      `<div class="sheet">
+        <div class="idcard${withdrawn ? ' revoked' : ''}">
+          <div class="idcard-head">
+            <h1>${escape(options.school || 'Pinnacle University')}</h1>
+            <h2>${withdrawn ? 'Withdrawn card' : 'Student'}</h2>
+          </div>
+          <div class="idcard-body">
+            ${card?.photoPath && options.photoUrl
+              ? `<img class="idcard-photo" src="${escape(options.photoUrl)}" alt="">`
+              : `<div class="idcard-photo-empty">${escape(initials)}</div>`}
+            <div class="idcard-fields">
+              <div class="idcard-name">${escape(name)}</div>
+              <div class="field"><span>Matric no.</span>${escape(holder.matricNumber ?? 'Not yet issued')}</div>
+              <div class="field"><span>Department</span>${escape(department)}</div>
+              <div class="field"><span>Faculty</span>${escape(faculty)}</div>
+              <div class="field"><span>Level</span>${escape(holder.level ?? '')}</div>
+            </div>
+          </div>
+          <div class="idcard-foot">
+            <span>${card ? `Valid till ${day(card.validUntil)}` : 'No card issued yet'}</span>
+            <span class="idcard-code">${escape(card?.verificationCode ?? '')}</span>
+          </div>
+        </div>
+        <footer>${card
+          ? `Cut on the dotted line. The eight-character number is what the gate reads; it is checked against this school's records. Generated ${new Date().toLocaleString()}.`
+          : `This sheet is a placeholder: the school has not issued a card to ${escape(name)} yet. Generated ${new Date().toLocaleString()}.`}</footer>
       </div>`,
     );
   },

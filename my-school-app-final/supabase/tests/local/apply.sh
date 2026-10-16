@@ -27,7 +27,8 @@ run shim sh -c "$PSQL -d sbcheck -f '$TESTDIR/00_supabase_shim.sql'"
 for f in 0001_schema 0002_functions 0003_rls 0004_storage 0005_seed \
          0006_academic_calendar 0007_course_registration 0008_results_workflow \
          0009_reopen_grade_period 0010_paystack_payments 0011_account_security \
-         0012_parent_role 0013_announcements 0014_harden_table_privileges; do
+         0012_parent_role 0013_announcements 0014_harden_table_privileges \
+         0015_assignments 0016_course_materials 0017_id_cards 0018_audit_log_indexes 0019_signup_tenant_from_caller; do
   run "$f" sh -c "$APPLY -d sbcheck -f '$MIG/$f.sql'"
 done
 # Applied a second time on purpose: re-pasting must be a no-op, because a
@@ -38,7 +39,8 @@ done
 for f in 0002_functions 0003_rls 0004_storage 0005_seed \
          0006_academic_calendar 0007_course_registration 0008_results_workflow \
          0009_reopen_grade_period 0010_paystack_payments 0011_account_security \
-         0012_parent_role 0013_announcements 0014_harden_table_privileges; do
+         0012_parent_role 0013_announcements 0014_harden_table_privileges \
+         0015_assignments 0016_course_materials 0017_id_cards 0018_audit_log_indexes 0019_signup_tenant_from_caller; do
   run "re-$f" sh -c "$APPLY -d sbcheck -f '$MIG/$f.sql'"
 done
 run fixtures sh -c "$PSQL -d sbcheck -f '$TESTDIR/10_fixtures.sql'"

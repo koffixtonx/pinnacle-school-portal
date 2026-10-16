@@ -33,6 +33,9 @@ import ReceiptLongIcon from '@mui/icons-material/ReceiptLong';
 import AssignmentTurnedInIcon from '@mui/icons-material/AssignmentTurnedIn';
 import CalendarMonthIcon from '@mui/icons-material/CalendarMonth';
 import CampaignIcon from '@mui/icons-material/Campaign';
+import LibraryBooksIcon from '@mui/icons-material/LibraryBooks';
+import BadgeIcon from '@mui/icons-material/Badge';
+import HistoryIcon from '@mui/icons-material/History';
 import { useCurrentUser, type Role } from '../hooks/useCurrentUser';
 import EmailIcon from '@mui/icons-material/Email';
 import LocationOnIcon from '@mui/icons-material/LocationOn';
@@ -220,6 +223,36 @@ const navItems: { label: string; description: string; to: string; icon: React.Re
   { label: 'Attendance', description: 'Track attendance', to: '/attendance', icon: <EventAvailableIcon />, roles: ACADEMIC_ROLES },
   { label: 'Grades', description: 'View and enter grades', to: '/grades', icon: <GradeIcon />, roles: ACADEMIC_ROLES },
   {
+    label: 'Assignments',
+    description: 'Hand in work, or set it',
+    to: '/assignments',
+    icon: <AssignmentTurnedInIcon />,
+    roles: ACADEMIC_ROLES,
+  },
+  {
+    // "Assignments" is where the work is read; this is where it is marked, and a
+    // lecturer needs both in the drawer at once.
+    label: 'Assignment Review',
+    description: 'Open handed-in work and mark it',
+    to: '/assignment-review',
+    icon: <AssignmentTurnedInIcon />,
+    roles: ['SUPER_ADMIN', 'SCHOOL_ADMIN', 'TEACHER'],
+  },
+  {
+    label: 'Materials',
+    description: 'Slides, handouts and readings',
+    to: '/materials',
+    icon: <LibraryBooksIcon />,
+    roles: ACADEMIC_ROLES,
+  },
+  {
+    label: 'ID Card',
+    description: 'Your card, or the cards your school issues',
+    to: '/id-card',
+    icon: <BadgeIcon />,
+    roles: ['SUPER_ADMIN', 'SCHOOL_ADMIN', 'STUDENT', 'NON_ACADEMIC_STAFF'],
+  },
+  {
     label: 'Results',
     description: 'Your GPA, CGPA and transcript',
     to: '/results',
@@ -232,6 +265,13 @@ const navItems: { label: string; description: string; to: string; icon: React.Re
     to: '/fees',
     icon: <ReceiptLongIcon />,
     roles: ['SUPER_ADMIN', 'SCHOOL_ADMIN', 'STUDENT'],
+  },
+  {
+    label: 'Audit Log',
+    description: 'Every change your school made',
+    to: '/audit-log',
+    icon: <HistoryIcon />,
+    roles: ['SUPER_ADMIN', 'SCHOOL_ADMIN'],
   },
   {
     label: 'Site Customization',

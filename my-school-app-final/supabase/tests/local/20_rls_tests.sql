@@ -1877,7 +1877,657 @@ end
 $body$;
 
 -- ---------------------------------------------------------------------------
--- 16. TRUNCATE belongs to nobody at the edge (0014)
+-- 16. Assignments and submissions (0015)
+-- ---------------------------------------------------------------------------
+-- The pair of doors this migration builds is deliberate: a task may be reworded
+-- from the browser, work may only be handed in through submit_assignment(), and a
+-- mark only through grade_submission(). The assertions below try each handle, and
+-- then the handles that should not exist - a hand-written submission row, a
+-- status moved by hand, a file path naming a course the uploader is not in.
+do $body$
+declare
+  v_admin   uuid := '00000000-0000-0000-0000-0000000000a1';
+  v_carol   uuid := '00000000-0000-0000-0000-0000000000b0';
+  v_bob     uuid := '00000000-0000-0000-0000-0000000000c0';
+  v_dave    uuid := '00000000-0000-0000-0000-0000000000d0';
+  v_cs201   uuid := '00000000-0000-0000-0000-0000000000c1';
+  v_cs202   uuid := '00000000-0000-0000-0000-0000000000c2';
+  v_lab     uuid := '00000000-0000-0000-0000-00000000f001';
+  v_late    uuid := '00000000-0000-0000-0000-00000000f002';
+  v_sub_path text;
+begin
+  v_sub_path := v_cs201::text || '/' || v_lab::text || '/' || v_bob::text || '/answer.pdf';
+
+  perform testhelp.allows(
+  'a teacher can set a task on the course they teach',
+  v_carol,
+  format($q$insert into public.assignments (id, course_id, created_by_id, title, instructions, due_at, points)
+          values (%L, %L, %L, 'Lab 1: normal forms', 'Normalise the schema in the fixture file.',
+                  now() + interval '7 days', 20)$q$, v_lab, v_cs201, v_carol),
+  format($q$select status || '/' ||
+                (tenant_id = (select id from public.tenants where slug = 'pinnacle-school'))::text
+       from public.assignments where id = %L$q$, v_lab),
+  'DRAFT/true');
+
+  perform testhelp.blocked(
+  'a teacher cannot set a task on a course they do not teach',
+  v_carol,
+  format($q$insert into public.assignments (course_id, created_by_id, title, due_at)
+          values (%L, %L, 'Essay', now() + interval '7 days')$q$, v_cs202, v_carol));
+
+  perform testhelp.blocked(
+  'a student cannot set a task at all',
+  v_bob,
+  format($q$insert into public.assignments (course_id, created_by_id, title, due_at)
+          values (%L, %L, 'Homework', now() + interval '7 days')$q$, v_cs201, v_bob));
+
+  -- The draft is the teacher's own until it is published; this is the assertion
+  -- that stops a half-written brief reaching a class.
+  perform testhelp.sees('a draft is invisible to a student on the course', v_bob,
+    format($q$select count(*) from public.assignments where id = %L$q$, v_lab), 0);
+  perform testhelp.sees('visible to the teacher who wrote it', v_carol,
+    format($q$select count(*) from public.assignments where id = %L$q$, v_lab), 1);
+  perform testhelp.sees('and invisible to an administrator at another school', v_dave,
+    format($q$select count(*) from public.assignments where id = %L$q$, v_lab), 0);
+
+  perform testhelp.blocked('a draft cannot be closed before it is set', v_carol,
+    format($q$select public.close_assignment(%L)$q$, v_lab));
+  perform testhelp.blocked('a student cannot publish someone else''s task', v_bob,
+    format($q$select public.publish_assignment(%L)$q$, v_lab));
+  perform testhelp.blocked('nor can an administrator at another school', v_dave,
+    format($q$select public.publish_assignment(%L)$q$, v_lab));
+
+  -- The upload has to follow the publication, because a file in a folder is the
+  -- one part of this flow a client does write directly.
+  perform testhelp.blocked('work cannot be filed against a task that is still a draft', v_bob,
+    format($q$insert into storage.objects (bucket_id, name, owner)
+            values ('assignment-submissions', %L, %L)$q$,
+            (v_cs201::text || '/' || v_lab::text || '/' || v_bob::text || '/early.pdf'), v_bob));
+
+  perform testhelp.truth('publishing reaches exactly the active roll', v_carol,
+    format($q$select (public.publish_assignment(%L) ->> 'students')::int = 1$q$, v_lab));
+  perform testhelp.blocked('and the same task cannot be published twice', v_carol,
+    format($q$select public.publish_assignment(%L)$q$, v_lab));
+
+  perform testhelp.sees('the student now sees the task', v_bob,
+    format($q$select count(*) from public.assignments where id = %L$q$, v_lab), 1);
+
+  perform testhelp.blocked('a student cannot file work into another student''s folder', v_bob,
+    format($q$insert into storage.objects (bucket_id, name, owner)
+            values ('assignment-submissions', %L, %L)$q$,
+            (v_cs201::text || '/' || v_lab::text || '/' || v_carol::text || '/note.txt'), v_bob));
+
+  perform testhelp.allows('their own folder is open to them', v_bob,
+    format($q$insert into storage.objects (bucket_id, name, owner)
+            values ('assignment-submissions', %L, %L)$q$, v_sub_path, v_bob),
+    format($q$select count(*)::text from storage.objects
+            where bucket_id = 'assignment-submissions' and name = %L$q$, v_sub_path),
+    '1');
+
+  perform testhelp.blocked('a submission cannot claim a file that was never uploaded', v_bob,
+    format($q$select public.submit_assignment(%L, 'Typed answer', %L)$q$, v_lab,
+      (v_cs201::text || '/' || v_lab::text || '/' || v_bob::text || '/ghost.pdf')));
+  perform testhelp.blocked('nor a path that names another course', v_bob,
+    format($q$select public.submit_assignment(%L, null, %L)$q$, v_lab,
+      (v_cs202::text || '/' || v_lab::text || '/' || v_bob::text || '/x.pdf')));
+
+  -- Submissions have no write policy and no table privilege. Both halves are
+  -- tested here because either one alone would still let a crafted client in.
+  perform testhelp.blocked('a student cannot write a submission row by hand', v_bob,
+    format($q$insert into public.assignment_submissions (assignment_id, student_id, note)
+            values (%L, %L, 'I did it')$q$, v_lab, v_bob));
+  perform testhelp.blocked('not even an administrator at their own school', v_admin,
+    format($q$insert into public.assignment_submissions (assignment_id, student_id, note)
+            values (%L, %L, 'Backdated for a friend')$q$, v_lab, v_bob));
+
+  perform testhelp.allows('the uploaded file becomes a submission', v_bob,
+    format($q$select public.submit_assignment(%L, 'My answer is attached', %L)$q$, v_lab, v_sub_path),
+    format($q$select status from public.assignment_submissions
+            where assignment_id = %L and student_id = %L$q$, v_lab, v_bob),
+    'SUBMITTED');
+
+  perform testhelp.sees('the teacher sees the submission', v_carol,
+    format($q$select count(*) from public.assignment_submissions where assignment_id = %L$q$, v_lab), 1);
+  perform testhelp.sees('the office sees it', v_admin,
+    format($q$select count(*) from public.assignment_submissions where assignment_id = %L$q$, v_lab), 1);
+  perform testhelp.sees('another school does not', v_dave,
+    format($q$select count(*) from public.assignment_submissions where assignment_id = %L$q$, v_lab), 0);
+
+  perform testhelp.blocked('a student cannot mark their own work', v_bob,
+    format($q$select public.grade_submission(id, 15, 'Nice')
+             from public.assignment_submissions where assignment_id = %L$q$, v_lab));
+  perform testhelp.blocked('a mark above the ceiling is refused before it is written', v_carol,
+    format($q$select public.grade_submission((select id from public.assignment_submissions
+                                              where assignment_id = %L), 21, 'Generous')$q$, v_lab));
+
+  perform testhelp.allows('the teacher marks it', v_carol,
+    format($q$select public.grade_submission((select id from public.assignment_submissions
+                                              where assignment_id = %L), 18, 'Good normalisation.')$q$, v_lab),
+    format($q$select status || '/' || score::text || '/' ||
+                  (graded_by_id = %L)::text
+       from public.assignment_submissions where assignment_id = %L$q$, v_carol, v_lab),
+    'GRADED/18.00/true');
+
+  perform testhelp.sees('and the student is told rather than left to notice', v_bob,
+    format($q$select count(*) from public.notifications
+            where category = 'academic' and recipient_id = %L$q$, v_bob), 1);
+
+  perform testhelp.blocked('marked work cannot be handed in again', v_bob,
+    format($q$select public.submit_assignment(%L, 'Second try')$q$, v_lab));
+  -- The revoked UPDATE privilege and guard_submission_score() are two separate
+  -- walls; this attempts the write and lets either one answer.
+  perform testhelp.blocked('a hand-written mark cannot exceed the task', v_admin,
+    format($q$update public.assignment_submissions set score = 99 where assignment_id = %L$q$, v_lab));
+
+  perform testhelp.truth('the roster arrives in one call, tallied', v_carol,
+    format($q$select (public.assignment_roster(%L) ->> 'graded')::int = 1
+             and (public.assignment_roster(%L) ->> 'missing')::int = 0
+             and jsonb_array_length(public.assignment_roster(%L) -> 'students') = 1$q$,
+           v_lab, v_lab, v_lab));
+  perform testhelp.blocked('a student cannot read the roster', v_bob,
+    format($q$select public.assignment_roster(%L)$q$, v_lab));
+  perform testhelp.blocked('nor can an administrator at another school', v_dave,
+    format($q$select public.assignment_roster(%L)$q$, v_lab));
+
+  perform testhelp.allows('closing the task stops it taking work', v_carol,
+    format($q$select public.close_assignment(%L)$q$, v_lab),
+    format($q$select status from public.assignments where id = %L$q$, v_lab),
+    'CLOSED');
+  perform testhelp.blocked('and a hand-in after closing is refused', v_bob,
+    format($q$select public.submit_assignment(%L, 'Sorry, late')$q$, v_lab));
+  -- A student keeps seeing a closed task: the mark and the wording stay together.
+  perform testhelp.sees('the student still sees the closed task and their mark', v_bob,
+    format($q$select count(*) from public.assignments where id = %L$q$, v_lab), 1);
+
+  perform testhelp.allows('the teacher may reword a task', v_carol,
+    format($q$update public.assignments set title = 'Lab 1: 1NF to 3NF' where id = %L$q$, v_lab),
+    format($q$select title from public.assignments where id = %L$q$, v_lab),
+    'Lab 1: 1NF to 3NF');
+  perform testhelp.blocked('but may not move it onto another course', v_carol,
+    format($q$update public.assignments set course_id = %L where id = %L$q$, v_cs202, v_lab));
+  perform testhelp.blocked('nor publish it by setting the column', v_carol,
+    format($q$update public.assignments set status = 'PUBLISHED' where id = %L$q$, v_lab));
+
+  -- Past the deadline, the work is still taken - and labelled.
+  perform testhelp.allows('a task set late into the term can be created', v_carol,
+    format($q$insert into public.assignments (id, course_id, created_by_id, title, due_at, points)
+            values (%L, %L, %L, 'Late exercise', now() - interval '2 days', 10)$q$, v_late, v_cs201, v_carol),
+    format($q$select status from public.assignments where id = %L$q$, v_late),
+    'DRAFT');
+  perform testhelp.allows('and published', v_carol,
+    format($q$select public.publish_assignment(%L)$q$, v_late),
+    format($q$select status from public.assignments where id = %L$q$, v_late),
+    'PUBLISHED');
+  perform testhelp.allows('a student who missed the deadline still gets to hand in, marked LATE', v_bob,
+    format($q$select public.submit_assignment(%L, 'Here is my attempt')$q$, v_late),
+    format($q$select status from public.assignment_submissions where assignment_id = %L$q$, v_late),
+    'LATE');
+  perform testhelp.blocked('a lecturer is not on the roll, so they cannot hand in either', v_carol,
+    format($q$select public.submit_assignment(%L, 'Demonstration answer')$q$, v_late));
+
+  -- The storage bucket is shared by every school, so the tenant gate - not the
+  -- administrator badge - is what keeps another school's files out of view.
+  perform testhelp.sees('the student sees their own file in the bucket', v_bob,
+    $q$select count(*) from storage.objects where bucket_id = 'assignment-submissions'$q$, 1);
+  perform testhelp.sees('the teacher of the course sees it', v_carol,
+    $q$select count(*) from storage.objects where bucket_id = 'assignment-submissions'$q$, 1);
+  perform testhelp.sees('their own administrator sees it', v_admin,
+    $q$select count(*) from storage.objects where bucket_id = 'assignment-submissions'$q$, 1);
+  perform testhelp.sees('an administrator at another school sees none of it', v_dave,
+    $q$select count(*) from storage.objects where bucket_id = 'assignment-submissions'$q$, 0);
+end
+$body$;
+
+-- ---------------------------------------------------------------------------
+-- 17. Course materials (0016)
+-- ---------------------------------------------------------------------------
+do $body$
+declare
+  v_admin  uuid := '00000000-0000-0000-0000-0000000000a1';
+  v_carol  uuid := '00000000-0000-0000-0000-0000000000b0';
+  v_bob    uuid := '00000000-0000-0000-0000-0000000000c0';
+  v_dave   uuid := '00000000-0000-0000-0000-0000000000d0';
+  v_cs201  uuid := '00000000-0000-0000-0000-0000000000c1';
+  v_cs202  uuid := '00000000-0000-0000-0000-0000000000c2';
+  v_slides text;
+  v_os     text;
+begin
+  v_slides := v_cs201::text || '/slides-week1.pdf';
+  v_os     := v_cs202::text || '/os-notes.pdf';
+
+  perform testhelp.allows('a lecturer uploads a handout into their course folder', v_carol,
+    format($q$insert into storage.objects (bucket_id, name, owner)
+            values ('course-materials', %L, %L)$q$, v_slides, v_carol),
+    format($q$select count(*)::text from storage.objects
+            where bucket_id = 'course-materials' and name = %L$q$, v_slides),
+    '1');
+
+  perform testhelp.blocked('a student cannot put a file on a course page', v_bob,
+    format($q$insert into storage.objects (bucket_id, name, owner)
+            values ('course-materials', %L, %L)$q$,
+            (v_cs201::text || '/essay-cheatsheet.pdf'), v_bob));
+  perform testhelp.blocked('nor can an administrator from another school', v_dave,
+    format($q$insert into storage.objects (bucket_id, name, owner)
+            values ('course-materials', %L, %L)$q$,
+            (v_cs201::text || '/planted.pdf'), v_dave));
+
+  perform testhelp.blocked('a material cannot point at a file that is not there', v_carol,
+    format($q$select public.attach_course_material(%L, 'Ghost slides', %L, 'ghost.pdf')$q$,
+      v_cs201, (v_cs201::text || '/ghost.pdf')));
+  perform testhelp.blocked('a path from another course''s folder is refused', v_carol,
+    format($q$select public.attach_course_material(%L, 'Mislabelled', %L, 'os-notes.pdf')$q$,
+      v_cs201, v_os));
+  perform testhelp.blocked('a student cannot publish a material', v_bob,
+    format($q$select public.attach_course_material(%L, 'My notes', %L, 'slides-week1.pdf')$q$,
+      v_cs201, v_slides));
+  perform testhelp.blocked('nor can an administrator from another school', v_dave,
+    format($q$select public.attach_course_material(%L, 'Cross-tenant', %L, 'slides-week1.pdf')$q$,
+      v_cs201, v_slides));
+  perform testhelp.blocked('a material without a title is refused', v_carol,
+    format($q$select public.attach_course_material(%L, '   ', %L, 'slides-week1.pdf')$q$,
+      v_cs201, v_slides));
+
+  perform testhelp.allows('the lecturer publishes the handout', v_carol,
+    format($q$select public.attach_course_material(%L, 'Week 1 slides', %L, 'slides-week1.pdf',
+                                                   'Normalisation basics', 'Week 1', 'application/pdf', 512000)$q$,
+      v_cs201, v_slides),
+    format($q$select title || '/' || week_label || '/' || file_name || '/' ||
+                  mime_type || '/' || size_bytes::text || '/' ||
+                  (uploaded_by_id = %L)::text
+       from public.course_materials where storage_path = %L$q$, v_carol, v_slides),
+  'Week 1 slides/Week 1/slides-week1.pdf/application/pdf/512000/true');
+
+  perform testhelp.sees('an enrolled student sees the handout', v_bob,
+    format($q$select count(*) from public.course_materials where storage_path = %L$q$, v_slides), 1);
+  perform testhelp.sees('the lecturer who posted it sees it', v_carol,
+    format($q$select count(*) from public.course_materials where storage_path = %L$q$, v_slides), 1);
+  perform testhelp.sees('another school''s administrator does not', v_dave,
+    format($q$select count(*) from public.course_materials where storage_path = %L$q$, v_slides), 0);
+  perform testhelp.sees('a lecturer who does not teach the course does not either', v_carol,
+    format($q$select count(*) from public.course_materials where storage_path = %L$q$, v_os), 0);
+
+  -- The object behind the row is reachable on the same terms as the row.
+  perform testhelp.sees('the student can read the stored object', v_bob,
+    format($q$select count(*) from storage.objects
+            where bucket_id = 'course-materials' and name = %L$q$, v_slides), 1);
+  perform testhelp.sees('and an administrator at another school cannot', v_dave,
+    format($q$select count(*) from storage.objects
+            where bucket_id = 'course-materials' and name = %L$q$, v_slides), 0);
+
+  perform testhelp.blocked('a client cannot insert a material row by hand', v_carol,
+    format($q$insert into public.course_materials (course_id, title, storage_path, file_name)
+            values (%L, 'By hand', %L, 'slides-week1.pdf')$q$, v_cs201, v_slides));
+  perform testhelp.blocked('nor delete one', v_admin,
+    format($q$delete from public.course_materials where storage_path = %L$q$, v_slides));
+
+  perform testhelp.allows('the lecturer can rename it', v_carol,
+    format($q$update public.course_materials set title = 'Week 1: normal forms',
+                             description = 'Slides plus the worked example'
+            where storage_path = %L$q$, v_slides),
+    format($q$select title from public.course_materials where storage_path = %L$q$, v_slides),
+    'Week 1: normal forms');
+  perform testhelp.blocked('but cannot move it onto another course', v_carol,
+    format($q$update public.course_materials set course_id = %L where storage_path = %L$q$, v_cs202, v_slides));
+  perform testhelp.blocked('nor repoint it at another file', v_carol,
+    format($q$update public.course_materials set storage_path = %L where storage_path = %L$q$, v_os, v_slides));
+  -- An RLS-filtered UPDATE raises nothing: it reports zero rows affected. So the
+  -- student's rename is asserted by what the row still says afterwards, which is
+  -- the only honest way to test a policy that hides rows rather than blocks them.
+  perform testhelp.allows('a student who tries to rename a handout changes nothing', v_bob,
+    format($q$update public.course_materials set title = 'Free for all' where storage_path = %L$q$, v_slides),
+    format($q$select title from public.course_materials where storage_path = %L$q$, v_slides),
+    'Week 1: normal forms');
+
+  -- An administrator is not limited to the courses they teach, but is limited to
+  -- their own school - which is what these two assertions are for.
+  perform testhelp.allows('an administrator can upload to any course in their school', v_admin,
+    format($q$insert into storage.objects (bucket_id, name, owner)
+            values ('course-materials', %L, %L)$q$, v_os, v_admin),
+    format($q$select count(*)::text from storage.objects
+            where bucket_id = 'course-materials' and name = %L$q$, v_os),
+    '1');
+  perform testhelp.allows('and attach the file they uploaded', v_admin,
+    format($q$select public.attach_course_material(%L, 'OS revision notes', %L, 'os-notes.pdf',
+                                                   '', 'All terms', 'application/pdf', 204800)$q$,
+      v_cs202, v_os),
+    format($q$select title || '/' || (uploaded_by_id = %L)::text
+       from public.course_materials where storage_path = %L$q$, v_admin, v_os),
+    'OS revision notes/true');
+  perform testhelp.sees('a student on that course sees it', v_bob,
+    format($q$select count(*) from public.course_materials where storage_path = %L$q$, v_os), 1);
+
+  perform testhelp.blocked('a student cannot withdraw a handout', v_bob,
+    format($q$select public.remove_course_material((select id from public.course_materials
+                                                    where storage_path = %L))$q$, v_os));
+  perform testhelp.blocked('nor can an administrator from another school', v_dave,
+    format($q$select public.remove_course_material((select id from public.course_materials
+                                                    where storage_path = %L))$q$, v_os));
+
+  -- Removing takes the object with it; the count below runs as the superuser, so
+  -- it is the definer's delete that emptied the bucket rather than a filter.
+  perform testhelp.allows('the office withdraws it and the stored file goes too', v_admin,
+    format($q$select public.remove_course_material((select id from public.course_materials
+                                                    where storage_path = %L))$q$, v_os),
+    format($q$select (select count(*) from public.course_materials where storage_path = %L)::text || '/' ||
+                      (select count(*) from storage.objects
+                        where bucket_id = 'course-materials' and name = %L)::text$q$, v_os, v_os),
+    '0/0');
+  perform testhelp.blocked('and a second withdrawal has nothing left to withdraw', v_admin,
+    format($q$select public.remove_course_material(%L)$q$, v_cs202));
+
+  perform testhelp.allows('the lecturer withdraws their own handout', v_carol,
+    format($q$select public.remove_course_material((select id from public.course_materials
+                                                    where storage_path = %L))$q$, v_slides),
+    format($q$select count(*)::text from public.course_materials where storage_path = %L$q$, v_slides),
+    '0');
+end
+$body$;
+
+-- ---------------------------------------------------------------------------
+-- 18. Student ID cards (0017)
+-- ---------------------------------------------------------------------------
+-- A card is the one document in this portal a stranger may end up reading off a
+-- lanyard, so the record has to be more than the picture: a code, a session and a
+-- revocation. Everything below is written from the office side and read from the
+-- student side, and nothing at all is writable by a client.
+do $body$
+declare
+  v_admin   uuid := '00000000-0000-0000-0000-0000000000a1';
+  v_carol   uuid := '00000000-0000-0000-0000-0000000000b0';
+  v_bob     uuid := '00000000-0000-0000-0000-0000000000c0';
+  v_dave    uuid := '00000000-0000-0000-0000-0000000000d0';
+  v_session uuid := '00000000-0000-0000-0000-0000000000a6';
+  v_photo   text;
+  v_shop    text;
+  v_code1   text;
+  v_code2   text;
+begin
+  v_photo := v_bob::text || '/photo.png';
+  v_shop  := v_bob::text || '/print-shop.jpg';
+
+  perform testhelp.sees('a student with no card is shown an empty page', v_bob,
+    format($q$select count(*) from public.student_id_cards where student_id = %L$q$, v_bob), 0);
+
+  perform testhelp.blocked('a lecturer cannot issue a card', v_carol,
+    format($q$select public.issue_student_id_card(%L)$q$, v_bob));
+  perform testhelp.blocked('a student cannot issue themselves one', v_bob,
+    format($q$select public.issue_student_id_card(%L)$q$, v_bob));
+  perform testhelp.blocked('no client may write a card row by hand', v_admin,
+    format($q$insert into public.student_id_cards (student_id, verification_code, valid_until)
+            values (%L, 'DEADBEEF', current_date + 30)$q$, v_bob));
+  perform testhelp.blocked('a card is not issued to a lecturer', v_admin,
+    format($q$select public.issue_student_id_card(%L)$q$, v_carol));
+
+  perform testhelp.truth('the active session is what the card will claim', v_admin,
+    $q$select public.current_academic_session() ->> 'label' = '2025/2026'$q$);
+  perform testhelp.truth('and a school with no active session gets nothing to claim', v_dave,
+    $q$select public.current_academic_session() is null$q$);
+
+  perform testhelp.allows('the office issues a card', v_admin,
+    format($q$select public.issue_student_id_card(%L)$q$, v_bob),
+    format($q$select status || '/' || (verification_code ~ '^[0-9A-F]{8}$')::text || '/' ||
+                  (valid_until = (select end_date from public.academic_sessions where id = %L))::text || '/' ||
+                  session_label
+       from public.student_id_cards where student_id = %L and status = 'ISSUED'$q$, v_session, v_bob),
+    'ISSUED/true/true/2025/2026');
+
+  select verification_code into v_code1
+    from public.student_id_cards where student_id = v_bob and status = 'ISSUED';
+
+  perform testhelp.sees('the student sees their own card', v_bob,
+    format($q$select count(*) from public.student_id_cards where student_id = %L$q$, v_bob), 1);
+  perform testhelp.sees('their office sees it', v_admin,
+    format($q$select count(*) from public.student_id_cards where student_id = %L$q$, v_bob), 1);
+  -- A teaching role is not a reason to browse the class's identity documents.
+  perform testhelp.sees('their lecturer does not', v_carol,
+    format($q$select count(*) from public.student_id_cards where student_id = %L$q$, v_bob), 0);
+  perform testhelp.sees('and neither does another school''s administrator', v_dave,
+    format($q$select count(*) from public.student_id_cards where student_id = %L$q$, v_bob), 0);
+
+  perform testhelp.truth('the card verifies at the gate', v_admin,
+    format($q$select public.verify_id_card(%L) -> 'holder' ->> 'lastName' = 'Bo'
+             and public.verify_id_card(%L) -> 'holder' ->> 'role' = 'STUDENT'
+             and (public.verify_id_card(%L) ->> 'status') = 'ISSUED'
+             and (public.verify_id_card(%L) ->> 'isExpired')::boolean is false$q$,
+           v_code1, v_code1, v_code1, v_code1));
+  perform testhelp.blocked('a student cannot check cards', v_bob,
+    format($q$select public.verify_id_card(%L)$q$, v_code1));
+  perform testhelp.blocked('nor can an administrator at another school', v_dave,
+    format($q$select public.verify_id_card(%L)$q$, v_code1));
+  perform testhelp.blocked('an unknown number has no holder', v_admin,
+    $q$select public.verify_id_card('DEADBEEF')$q$);
+
+  -- The picture follows the person, not the badge.
+  perform testhelp.allows('the student uploads their own picture', v_bob,
+    format($q$insert into storage.objects (bucket_id, name, owner)
+            values ('id-card-photos', %L, %L)$q$, v_photo, v_bob),
+    format($q$select count(*)::text from storage.objects
+            where bucket_id = 'id-card-photos' and name = %L$q$, v_photo),
+    '1');
+  perform testhelp.blocked('but not into another student''s folder', v_bob,
+    format($q$insert into storage.objects (bucket_id, name, owner)
+            values ('id-card-photos', %L, %L)$q$, (v_carol::text || '/someone.png'), v_bob));
+  perform testhelp.blocked('nor may an administrator from another school plant one', v_dave,
+    format($q$insert into storage.objects (bucket_id, name, owner)
+            values ('id-card-photos', %L, %L)$q$, (v_bob::text || '/planted.png'), v_dave));
+  perform testhelp.sees('the student reads back their own picture', v_bob,
+    format($q$select count(*) from storage.objects
+            where bucket_id = 'id-card-photos' and name = %L$q$, v_photo), 1);
+  perform testhelp.sees('their lecturer cannot read it', v_carol,
+    format($q$select count(*) from storage.objects
+            where bucket_id = 'id-card-photos' and name = %L$q$, v_photo), 0);
+
+  perform testhelp.blocked('a card cannot be issued with someone else''s photo', v_admin,
+    format($q$select public.issue_student_id_card(%L, %L)$q$, v_bob, (v_carol::text || '/someone.png')));
+  perform testhelp.blocked('nor with a photo that was never uploaded', v_admin,
+    format($q$select public.issue_student_id_card(%L, %L)$q$, v_bob, (v_bob::text || '/missing.png')));
+
+  perform testhelp.allows('the office can file a print-shop photo for a student', v_admin,
+    format($q$insert into storage.objects (bucket_id, name, owner)
+            values ('id-card-photos', %L, %L)$q$, v_shop, v_admin),
+    format($q$select count(*)::text from storage.objects
+            where bucket_id = 'id-card-photos' and name = %L$q$, v_shop),
+    '1');
+
+  -- Replacing a damaged card retires the old one in the same call: two live cards
+  -- for one person is how a gate stops meaning anything.
+  perform testhelp.allows('a replacement card retires the one it replaces', v_admin,
+    format($q$select public.issue_student_id_card(%L, %L)$q$, v_bob, v_shop),
+    format($q$select (select count(*) from public.student_id_cards where student_id = %L)::text || '/' ||
+                      (select count(*) from public.student_id_cards
+                        where student_id = %L and status = 'ISSUED')::text || '/' ||
+                      (select photo_path from public.student_id_cards
+                        where student_id = %L and status = 'ISSUED')$q$, v_bob, v_bob, v_bob),
+    '2/1/' || v_shop);
+
+  select verification_code into v_code2
+    from public.student_id_cards where student_id = v_bob and status = 'ISSUED';
+
+  perform testhelp.truth('the retired number verifies as revoked', v_admin,
+    format($q$select (public.verify_id_card(%L) ->> 'status') = 'REVOKED'
+             and public.verify_id_card(%L) ->> 'revokedAt' is not null$q$, v_code1, v_code1));
+  perform testhelp.truth('the new number verifies as live', v_admin,
+    format($q$select (public.verify_id_card(%L) ->> 'status') = 'ISSUED'$q$, v_code2));
+
+  perform testhelp.allows('the office withdraws the live card', v_admin,
+    format($q$select public.revoke_student_id_card(id, %L)
+             from public.student_id_cards where student_id = %L and status = 'ISSUED'$q$,
+      'Left on a bus', v_bob),
+    format($q$select status || '/' || (revoked_at is not null)::text
+       from public.student_id_cards where verification_code = %L$q$, v_code2),
+    'REVOKED/true');
+  perform testhelp.blocked('withdrawing it twice is not a thing that happened', v_admin,
+    format($q$select public.revoke_student_id_card(id, null)
+             from public.student_id_cards where verification_code = %L$q$, v_code2));
+  perform testhelp.blocked('a student cannot withdraw their own card', v_bob,
+    format($q$select public.revoke_student_id_card(id, null)
+             from public.student_id_cards where verification_code = %L$q$, v_code2));
+  perform testhelp.blocked('a withdrawn card cannot be reinstated by hand', v_admin,
+    format($q$update public.student_id_cards set status = 'ISSUED' where verification_code = %L$q$, v_code2));
+
+  perform testhelp.truth('no live card is left for the withdrawn number', v_admin,
+    format($q$select (public.verify_id_card(%L) ->> 'status') = 'REVOKED'$q$, v_code2));
+  perform testhelp.truth('the student is told the card is ready, then told it is gone', v_bob,
+    format($q$select (select count(*) from public.notifications
+                       where recipient_id = %L and title = 'Your student ID card is ready') = 2
+             and (select count(*) from public.notifications
+                       where recipient_id = %L
+                         and title = 'Your student ID card has been withdrawn') = 1$q$,
+           v_bob, v_bob));
+end
+$body$;
+
+-- ---------------------------------------------------------------------------
+-- 19. The audit trail an administrator now reads page by page (0003, 0018, 0019)
+-- ---------------------------------------------------------------------------
+-- Until Phase 5 the trail had one reader: a dashboard tab that fetched 25 rows
+-- and searched them in the browser. It is now a filtered, paged page, which puts
+-- three things under test that the old shape never exercised - tenancy under a
+-- filter, the newest-first ordering the cursor pages backwards through, and the
+-- actor name the page embeds beside each row. The index migration must not move
+-- any of those boundaries, so every read below is the query the page sends.
+do $body$
+declare
+  v_admin uuid := '00000000-0000-0000-0000-0000000000a1';
+  v_carol uuid := '00000000-0000-0000-0000-0000000000b0';
+  v_bob   uuid := '00000000-0000-0000-0000-0000000000c0';
+  v_dave  uuid := '00000000-0000-0000-0000-0000000000d0';
+  v_pin   uuid;
+  v_riv   uuid;
+  v_mine  bigint;
+  v_riverside bigint;
+begin
+  select tenant_id into v_pin from public.profiles where id = v_admin;
+  select tenant_id into v_riv from public.profiles where id = v_dave;
+
+  -- Write something as the other school's office, so a cross-tenant assertion
+  -- below cannot pass simply because riverside has no history at all.
+  perform testhelp.allows('a write by the other school''s office leaves a row in its own trail', v_dave,
+    format($q$update public.profiles set phone = %L where id = %L$q$, '+234799900001', v_dave),
+    format($q$select ((select count(*) from public.audit_logs where tenant_id = %L) > 0)::text$q$, v_riv),
+    'true');
+
+  select count(*) into v_mine from public.audit_logs where tenant_id = v_pin;
+  select count(*) into v_riverside from public.audit_logs where tenant_id = v_riv;
+
+  perform testhelp.sees('the office reads its school''s whole trail', v_admin,
+    format($q$select count(*) from public.audit_logs where tenant_id = %L$q$, v_pin), v_mine);
+  perform testhelp.sees('a teacher who opens the audit page is shown nothing', v_carol,
+    $q$select count(*) from public.audit_logs$q$, 0);
+  perform testhelp.sees('a student is shown nothing', v_bob,
+    $q$select count(*) from public.audit_logs$q$, 0);
+  perform testhelp.sees('and neither is the anonymous key', null,
+    $q$select count(*) from public.audit_logs$q$, 0);
+
+  -- The two schools now both have rows, so the next pair measures the policy
+  -- rather than the fixtures.
+  perform testhelp.sees('the other school''s office sees only its own rows', v_dave,
+    $q$select count(*) from public.audit_logs$q$, v_riverside);
+  perform testhelp.sees('no filter opens the other school''s history to it', v_dave,
+    format($q$select count(*) from public.audit_logs where tenant_id = %L$q$, v_pin), 0);
+
+  -- What the page actually sends: newest first, then a page of 25, then a table
+  -- filter on top. Each is counted against the same school, so a widening policy
+  -- would show up as a number that does not match.
+  perform testhelp.sees('the first page is the newest rows, capped at the page size', v_admin,
+    $q$select count(*) from (select 1 from public.audit_logs order by created_at desc limit 25) q$q$,
+    least(v_mine, 25));
+  perform testhelp.sees('filtering that page by table keeps it inside the school', v_admin,
+    format($q$select count(*) from public.audit_logs where entity = 'profiles' and tenant_id = %L$q$, v_pin),
+    (select count(*) from public.audit_logs where entity = 'profiles' and tenant_id = v_pin));
+
+  -- Every row the office can read has to name the person who made it, or the
+  -- trail is a list of anonymous changes. This is the assertion that found
+  -- 0019: two rows recorded the creation of riverside accounts under pinnacle's
+  -- tenant, where pinnacle's own RLS cannot join the actor profile - so the row
+  -- was unreadable by the school that owns it and unnamed for the school that
+  -- could see it.
+  perform testhelp.sees('the office can name the actor behind every row it reads', v_admin,
+    $q$select count(*) from public.audit_logs a
+       left join public.profiles p on p.id = a.actor_id
+      where a.actor_id is not null and p.id is null$q$, 0);
+
+  -- 0018 is an index migration, so the assertion that matters is that the page's
+  -- ordering got an index to walk and the tenancy boundary is untouched. The
+  -- comparison is case-insensitive because the catalog prints the direction
+  -- upper-case, whatever the creating statement said.
+  perform testhelp.truth('and the two indexes the page orders by are the ones that landed', v_admin,
+    $q$select (select indexdef from pg_indexes where schemaname = 'public' and indexname = 'audit_logs_tenant_recent_idx')
+               ilike '%(tenant_id, created_at desc)%'
+        and (select indexdef from pg_indexes where schemaname = 'public' and indexname = 'audit_logs_tenant_entity_idx')
+               ilike '%(tenant_id, entity, created_at desc)%'$q$);
+
+  -- 0019, the half that matters going forward: handle_new_auth_user() used to
+  -- resolve the tenant from a hardcoded slug, so the INSERT record of a second
+  -- school's student was filed in the first school's trail and only the
+  -- following UPDATE was correct. The founding record of an account riverside
+  -- owns must be born in riverside's history.
+  perform testhelp.allows('a second school''s student is filed in its own trail from the first record', v_dave,
+    $q$select public.create_school_user('Nina','Cross','nina@riverside.test','STUDENT')$q$,
+    $q$select (a.tenant_id = (select id from public.tenants where slug = 'riverside-college'))::text
+       from public.audit_logs a
+      where a.entity = 'profiles' and a.action = 'insert'
+        and a.entity_id = (select id::text from public.profiles where email = 'nina@riverside.test')$q$,
+    'true');
+
+  -- A fresh database can no longer produce the row the repair looks for, which
+  -- would leave that statement untested and free to rot. So break a creation
+  -- record the way the old function did, run the update 0019 runs, read it back.
+  perform testhelp.direct('a creation record pushed out of its school reads back out of it',
+    format($q$update public.audit_logs set tenant_id = %L
+              where entity = 'profiles' and action = 'insert'
+                and entity_id = (select id::text from public.profiles where email = 'nina@riverside.test')$q$, v_pin),
+    format($q$select (a.tenant_id = %L)::text from public.audit_logs a
+              where a.entity = 'profiles' and a.action = 'insert'
+                and a.entity_id = (select id::text from public.profiles where email = 'nina@riverside.test')$q$, v_pin),
+    'true');
+
+  perform testhelp.direct('and the repair statement moves it home',
+    $q$update public.audit_logs a set tenant_id = creator.tenant_id
+        from public.profiles row_profile, public.profiles creator
+       where a.entity = 'profiles' and a.action = 'insert'
+         and creator.id = a.actor_id
+         and row_profile.id::text = a.entity_id
+         and row_profile.tenant_id = creator.tenant_id
+         and a.tenant_id is distinct from creator.tenant_id$q$,
+    format($q$select (a.tenant_id = %L)::text from public.audit_logs a
+              where a.entity = 'profiles' and a.action = 'insert'
+                and a.entity_id = (select id::text from public.profiles where email = 'nina@riverside.test')$q$, v_riv),
+    'true');
+
+  -- And the invariant the repair enforces, stated precisely. "An audit row
+  -- disagrees with its profile today" is NOT the defect: the trail logs what the
+  -- row said when it was written, so a record of an account that later moved
+  -- schools belongs where it was born. The signature is narrower - a creation
+  -- record filed in a third school while both its creator and its account sit in
+  -- one school. A fresh database cannot produce it once the function is fixed,
+  -- which is why this checks the shape rather than counting repaired rows.
+  perform testhelp.direct('no creation record is filed outside the school that made the account',
+    $q$select 1$q$,
+    $q$select ((select count(*) from public.audit_logs a
+                  join public.profiles made on made.id::text = a.entity_id
+                  join public.profiles maker on maker.id = a.actor_id
+                 where a.entity = 'profiles' and a.action = 'insert'
+                   and made.tenant_id = maker.tenant_id
+                   and a.tenant_id is distinct from maker.tenant_id) = 0)::text$q$,
+    'true');
+
+  -- The coalesce has a second branch. GoTrue's own sign-up carries no claim, so
+  -- auth_tenant_id() is null there and the account must still land in the school
+  -- the deployment boots with - not in nothing.
+  perform testhelp.direct('a claim-less sign-up still lands in the default school',
+    $q$insert into auth.users (id, aud, role, email, encrypted_password, email_confirmed_at, raw_user_meta_data)
+       values ('00000000-0000-0000-0000-0000000000e9','authenticated','authenticated','walk-in@example.com','x',now(),
+               '{"firstName":"Walk","lastName":"In"}')$q$,
+    $q$select (p.tenant_id = (select id from public.tenants where slug = 'pinnacle-school')
+              and p.role = 'STUDENT')::text
+       from public.profiles p where p.email = 'walk-in@example.com'$q$,
+    'true');
+end
+$body$;
+
+-- ---------------------------------------------------------------------------
+-- 20. TRUNCATE belongs to nobody at the edge (0014)
 -- ---------------------------------------------------------------------------
 -- Every section above tests a policy, and a policy is a filter on
 -- SELECT/INSERT/UPDATE/DELETE. TRUNCATE is not filtered: Postgres checks the

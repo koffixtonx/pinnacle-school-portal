@@ -268,6 +268,18 @@ export const mfaService = {
   },
 };
 
+export interface AuditEntry {
+  id: string;
+  action: string;
+  entity: string;
+  entityId: string;
+  summary: string;
+  changedData: string;
+  createdAt: string;
+  actorId: string | null;
+  actor: { id: string; firstName: string; lastName: string; email: string | null; role: string } | null;
+}
+
 export const adminService = {
   async getEnrollmentAnalytics() {
     const [trend, totals] = await Promise.all([
@@ -474,19 +486,52 @@ export const adminService = {
     return { data: { success: true, jobId: job.id } };
   },
 
-  async getAuditLogs(params?: { limit?: number; cursor?: string }) {
+  async getAuditLogs(params?: {
+    limit?: number;
+    cursor?: string;
+    entity?: string;
+    action?: string;
+    actorId?: string;
+    from?: string;
+    to?: string;
+  }) {
     const limit = Math.min(Number(params?.limit) || 25, 100);
     let query = supabase
       .from('audit_logs')
-      .select('id, action, entity, entity_id, summary, created_at, actor_id')
+      .select(
+        'id, action, entity, entity_id, summary, changed_data, created_at, actor_id, ' +
+          'actor:profiles!audit_logs_actor_id_fkey(id, first_name, last_name, email, role)',
+      )
       .order('created_at', { ascending: false })
+      .order('id', { ascending: false })
       .limit(limit + 1);
-    if (params?.cursor) query = query.lt('created_at', params.cursor);
 
-    const rows = camel(asArray(unwrap(await query, 'Failed to load the audit log.')));
+    if (params?.entity) query = query.eq('entity', params.entity);
+    if (params?.action) query = query.eq('action', params.action);
+    if (params?.actorId) query = query.eq('actor_id', params.actorId);
+    if (params?.from) query = query.gte('created_at', params.from);
+    if (params?.to) query = query.lt('created_at', params.to);
+
+    // One transaction stamps the same now() on every row it writes, so a single
+    // action leaves several entries sharing a timestamp - provisioning alone
+    // writes two. The read orders by id inside those ties, so the cursor has to
+    // carry both: comparing only the timestamp would resume partway through a
+    // tied group and skip the rows under it permanently.
+    const [cursorAt, cursorId] = String(params?.cursor ?? '').split('|');
+    if (cursorAt && cursorId) {
+      query = query.or(`created_at.lt.${cursorAt},and(created_at.eq.${cursorAt},id.lt.${cursorId})`);
+    } else if (params?.cursor) {
+      query = query.lt('created_at', params.cursor);
+    }
+
+    const rows = camel(asArray(unwrap(await query, 'Failed to load the audit log.'))) as AuditEntry[];
     const hasNext = rows.length > limit;
     if (hasNext) rows.pop();
-    return paged(rows, hasNext ? new Date(rows[rows.length - 1].createdAt).toISOString() : null);
+    const last = rows[rows.length - 1];
+    // createdAt is passed through exactly as the database sent it. Rounding it
+    // to milliseconds - as a Date would - makes the tie comparison miss rows the
+    // next page then never returns.
+    return paged(rows, hasNext && last ? `${last.createdAt}|${last.id}` : null);
   },
 
   async listFaculties() {
@@ -2246,6 +2291,569 @@ export const guardianService = {
       ),
     ));
     return envelope(rows as GuardianLink[]);
+  },
+};
+
+export type AssignmentStatus = 'DRAFT' | 'PUBLISHED' | 'CLOSED';
+export type SubmissionStatus = 'SUBMITTED' | 'LATE' | 'GRADED';
+
+export interface Assignment {
+  id: string;
+  courseId: string;
+  title: string;
+  instructions: string;
+  dueAt: string;
+  points: number;
+  status: AssignmentStatus;
+  publishedAt: string | null;
+  createdAt: string;
+  course?: { id: string; code: string; title: string } | null;
+  submission?: AssignmentSubmission | null;
+}
+
+export interface AssignmentSubmission {
+  id: string;
+  assignmentId: string;
+  studentId: string;
+  note: string;
+  filePath: string | null;
+  fileName: string | null;
+  fileSizeBytes: number | null;
+  status: SubmissionStatus;
+  score: number | null;
+  feedback: string | null;
+  submittedAt: string;
+  gradedAt: string | null;
+}
+
+export interface AssignmentRoster {
+  assignmentId: string;
+  submitted: number;
+  late: number;
+  graded: number;
+  missing: number;
+  students: Array<{
+    studentId: string;
+    firstName: string;
+    lastName: string;
+    matricNumber: string | null;
+    submissionId: string | null;
+    status: SubmissionStatus | null;
+    note: string | null;
+    filePath: string | null;
+    fileName: string | null;
+    fileSizeBytes: number | null;
+    submittedAt: string | null;
+    score: number | null;
+    feedback: string | null;
+  }>;
+}
+
+export interface CourseMaterial {
+  id: string;
+  courseId: string;
+  title: string;
+  description: string;
+  weekLabel: string;
+  storagePath: string;
+  fileName: string;
+  mimeType: string | null;
+  sizeBytes: number | null;
+  createdAt: string;
+  uploadedBy?: { id: string; firstName?: string; lastName?: string } | null;
+}
+
+export interface IdCard {
+  id: string;
+  studentId: string;
+  verificationCode: string;
+  photoPath: string | null;
+  sessionLabel: string;
+  validFrom: string;
+  validUntil: string;
+  status: 'ISSUED' | 'REVOKED';
+  issuedAt: string;
+  revokedAt: string | null;
+}
+
+const ASSIGNMENT_SELECT =
+  'id, course_id, title, instructions, due_at, points, status, published_at, created_at';
+const SUBMISSION_SELECT =
+  'id, assignment_id, student_id, note, file_path, file_name, file_size_bytes, status, score, feedback, submitted_at, graded_at';
+const MATERIAL_SELECT =
+  'id, course_id, title, description, week_label, storage_path, file_name, mime_type, size_bytes, created_at, uploaded_by:profiles!course_materials_uploaded_by_id_fkey(id, first_name, last_name)';
+const ID_CARD_SELECT =
+  'id, student_id, verification_code, photo_path, session_label, valid_from, valid_until, status, issued_at, revoked_at, issued_by:profiles!student_id_cards_issued_by_id_fkey(id, first_name, last_name)';
+
+/** Storage rejects a name with a path separator in it, and a school should never see that error. */
+const storageSafeName = (name: string) =>
+  name.replace(/[^\w.()+-]/g, '_').replace(/^[_.]+/, '').slice(0, 80) || 'file';
+
+const fileStamp = () => `${Date.now()}-${Math.random().toString(36).slice(2, 8)}`;
+
+/**
+ * The Phase 4 buckets are private, so every read is a short-lived signed URL
+ * issued to the person who has just passed the object's policy - the difference
+ * between an obscure name and access control.
+ */
+async function signedDownloadUrl(bucket: string, key: string): Promise<string> {
+  const { data, error } = await supabase.storage.from(bucket).createSignedUrl(key, 120);
+  if (error || !data?.signedUrl) throw toServiceError(error, 'That file could not be opened.');
+  return data.signedUrl;
+}
+
+/** `limitMb` mirrors the bucket's own ceiling so the student hears it before the upload fails. */
+async function uploadPrivateFile(bucket: string, key: string, file: File, limitMb: number) {
+  if (file.size > limitMb * 1024 * 1024) {
+    throw new ServiceError(`That file is bigger than the ${limitMb} MB limit for this school.`);
+  }
+  const { error } = await supabase.storage.from(bucket).upload(key, file, {
+    cacheControl: '3600',
+    upsert: false,
+    contentType: file.type || 'application/octet-stream',
+  });
+  if (error) throw toServiceError(error, 'The upload failed. Please try again.');
+}
+
+/** 0015 checks the same range; saying it here saves a round trip to a constraint name. */
+const isAssignmentPoints = (value: number) => Number.isFinite(value) && value > 0 && value <= 100;
+
+export const assignmentService = {
+  /** Everything set for the courses the signed-in student is on, soonest first. */
+  async listForStudent() {
+    const userId = await getCurrentUserId();
+    const items = camel(asArray(
+      unwrap(
+        await supabase
+          .from('assignments')
+          .select(`${ASSIGNMENT_SELECT}, course:courses(id, code, title)`)
+          .neq('status', 'DRAFT')
+          .order('due_at', { ascending: true })
+          .limit(100),
+        'Your assignments could not be loaded.',
+      ),
+    )) as Assignment[];
+
+    if (items.length) {
+      const mine = camel(asArray(
+        unwrap(
+          await supabase
+            .from('assignment_submissions')
+            .select(SUBMISSION_SELECT)
+            .eq('student_id', userId)
+            .in('assignment_id', items.map((item) => item.id)),
+          'Your submissions could not be loaded.',
+        ),
+      )) as AssignmentSubmission[];
+      const byAssignment = new Map(mine.map((row) => [row.assignmentId, row]));
+      items.forEach((item) => { item.submission = byAssignment.get(item.id) ?? null; });
+    }
+    return envelope(items);
+  },
+
+  /**
+   * Everything the caller may act on, drafts included: a teacher's own courses,
+   * the office's whole school. RLS decides that half, which is why no filter
+   * appears here.
+   */
+  async listOwned() {
+    const rows = camel(asArray(
+      unwrap(
+        await supabase
+          .from('assignments')
+          .select(`${ASSIGNMENT_SELECT}, course:courses(id, code, title)`)
+          .order('due_at', { ascending: false })
+          .limit(200),
+        'Your assignments could not be loaded.',
+      ),
+    )) as Assignment[];
+    return envelope(rows);
+  },
+
+  /** The tasks the caller teaches or runs, drafts included. */
+  async listForCourse(courseId: string) {
+    if (!courseId) throw new ServiceError('Choose a course.');
+    const rows = camel(asArray(
+      unwrap(
+        await supabase
+          .from('assignments')
+          .select(`${ASSIGNMENT_SELECT}, course:courses(id, code, title)`)
+          .eq('course_id', courseId)
+          .order('due_at', { ascending: true }),
+        'The assignments for this course could not be loaded.',
+      ),
+    )) as Assignment[];
+    return envelope(rows);
+  },
+
+  async create(data: { courseId: string; title: string; instructions?: string; dueAt: string; points: number }) {
+    const title = data.title?.trim();
+    if (!data.courseId) throw new ServiceError('Choose the course this task belongs to.');
+    if (!title) throw new ServiceError('Give the assignment a title.');
+    if (!data.dueAt) throw new ServiceError('Choose when it is due.');
+    if (!isAssignmentPoints(Number(data.points))) throw new ServiceError('Marks must be between 1 and 100.');
+
+    const row = unwrap(
+      await supabase
+        .from('assignments')
+        .insert({
+          course_id: data.courseId,
+          title,
+          instructions: data.instructions?.trim() || '',
+          due_at: new Date(data.dueAt).toISOString(),
+          points: Number(data.points),
+        })
+        .select(`${ASSIGNMENT_SELECT}, course:courses(id, code, title)`)
+        .single(),
+      'The assignment could not be saved.',
+    );
+    return envelope(camel(row) as Assignment);
+  },
+
+  /** Only the four columns 0015 leaves writable; publish and close are RPCs. */
+  async edit(id: string, data: { title: string; instructions?: string; dueAt: string; points: number }) {
+    if (!id) throw new ServiceError('Choose the assignment to change.');
+    const title = data.title?.trim();
+    if (!title) throw new ServiceError('Give the assignment a title.');
+    if (!isAssignmentPoints(Number(data.points))) throw new ServiceError('Marks must be between 1 and 100.');
+
+    const row = unwrap(
+      await supabase
+        .from('assignments')
+        .update({
+          title,
+          instructions: data.instructions?.trim() || '',
+          due_at: new Date(data.dueAt).toISOString(),
+          points: Number(data.points),
+        })
+        .eq('id', id)
+        .select(ASSIGNMENT_SELECT)
+        .maybeSingle(),
+      'The assignment could not be saved.',
+    );
+    if (!row) throw new ServiceError('That assignment is no longer here.');
+    return envelope(camel(row) as Assignment);
+  },
+
+  /** Tells the teacher how many students it reaches, which is the point of the button. */
+  async publish(id: string) {
+    if (!id) throw new ServiceError('Choose the assignment to publish.');
+    const result = unwrap<Record<string, any>>(
+      await supabase.rpc('publish_assignment', { p_assignment_id: id }),
+      'The assignment could not be published.',
+    );
+    return envelope({
+      id: String(result?.id ?? id),
+      status: result?.status as AssignmentStatus,
+      publishedAt: result?.publishedAt ?? null,
+      students: Number(result?.students ?? 0),
+    });
+  },
+
+  async close(id: string) {
+    if (!id) throw new ServiceError('Choose the assignment to close.');
+    const row = unwrap(
+      await supabase.rpc('close_assignment', { p_assignment_id: id }),
+      'The assignment could not be closed.',
+    );
+    return envelope(camel(row) as Assignment);
+  },
+
+  /** The roll, each person's state, and the tallies, in one call. */
+  async roster(id: string) {
+    if (!id) throw new ServiceError('Choose an assignment.');
+    const result = camel<AssignmentRoster>(
+      unwrap<Record<string, any>>(
+        await supabase.rpc('assignment_roster', { p_assignment_id: id }),
+        'The roster could not be loaded.',
+      ),
+    );
+    return envelope({ ...result, students: asArray(result?.students) });
+  },
+
+  /**
+   * The file goes up first, into a folder that names this course, this task and
+   * this student - which is the path submit_assignment() will refuse anything else
+   * to. The row is only written once the object is really there.
+   */
+  async submit(data: { assignmentId: string; note?: string; file?: File | null }) {
+    const userId = await getCurrentUserId();
+    const note = data.note?.trim() || '';
+    if (!data.assignmentId) throw new ServiceError('Choose the work you are handing in.');
+    if (!note && !data.file) throw new ServiceError('Write something or attach a file before handing it in.');
+
+    const assignment = unwrap<{ course_id: string }>(
+      await supabase
+        .from('assignments')
+        .select('course_id')
+        .eq('id', data.assignmentId)
+        .maybeSingle(),
+      'That assignment is no longer here.',
+    );
+    if (!assignment) throw new ServiceError('That assignment is no longer here.');
+
+    let filePath: string | null = null;
+    if (data.file) {
+      const key = `${assignment.course_id}/${data.assignmentId}/${userId}/${fileStamp()}-${storageSafeName(data.file.name)}`;
+      await uploadPrivateFile('assignment-submissions', key, data.file, 20);
+      filePath = key;
+    }
+
+    const row = unwrap(
+      await supabase.rpc('submit_assignment', {
+        p_assignment_id: data.assignmentId,
+        p_note: note || null,
+        p_file_path: filePath,
+        p_file_name: data.file?.name || null,
+        p_file_size: data.file ? data.file.size : null,
+      }),
+      'Your work could not be handed in.',
+    );
+    return envelope(camel(row) as AssignmentSubmission);
+  },
+
+  async grade(submissionId: string, score: number, feedback?: string) {
+    if (!submissionId) throw new ServiceError('Choose the submission to mark.');
+    if (!Number.isFinite(score) || score < 0) throw new ServiceError('Enter the mark to record.');
+
+    const row = unwrap(
+      await supabase.rpc('grade_submission', {
+        p_submission_id: submissionId,
+        p_score: Math.round(score * 100) / 100,
+        p_feedback: feedback?.trim() || null,
+      }),
+      'The mark could not be saved.',
+    );
+    return envelope(camel(row) as AssignmentSubmission);
+  },
+
+  async download(filePath: string) {
+    if (!filePath) throw new ServiceError('There is no file attached to this submission.');
+    return envelope(await signedDownloadUrl('assignment-submissions', filePath));
+  },
+};
+
+export const materialService = {
+  async listForCourse(courseId: string) {
+    if (!courseId) throw new ServiceError('Choose a course.');
+    const rows = camel(asArray(
+      unwrap(
+        await supabase
+          .from('course_materials')
+          .select(MATERIAL_SELECT)
+          .eq('course_id', courseId)
+          .order('created_at', { ascending: false }),
+        'The course materials could not be loaded.',
+      ),
+    )) as CourseMaterial[];
+    return envelope(rows);
+  },
+
+  /** Everything on every course the caller is on, teaches or runs - the reading list. */
+  async listVisible() {
+    const rows = camel(asArray(
+      unwrap(
+        await supabase
+          .from('course_materials')
+          .select(`${MATERIAL_SELECT}, course:courses(id, code, title)`)
+          .order('created_at', { ascending: false })
+          .limit(200),
+        'Your materials could not be loaded.',
+      ),
+    )) as Array<CourseMaterial & { course?: { id: string; code: string; title: string } | null }>;
+    return envelope(rows);
+  },
+
+  /**
+   * Upload then attach, in that order: attach_course_material() refuses a path
+   * whose object does not exist, so a cancelled upload leaves no row behind.
+   */
+  async publish(data: {
+    courseId: string;
+    title: string;
+    file: File;
+    description?: string;
+    weekLabel?: string;
+  }) {
+    const userId = await getCurrentUserId();
+    const title = data.title?.trim();
+    if (!data.courseId) throw new ServiceError('Choose the course this belongs to.');
+    if (!title) throw new ServiceError('Give the file a title so the class knows what it is.');
+    if (!data.file) throw new ServiceError('Choose the file to attach.');
+
+    const key = `${data.courseId}/${fileStamp()}-${storageSafeName(data.file.name)}`;
+    await uploadPrivateFile('course-materials', key, data.file, 50);
+
+    const row = unwrap(
+      await supabase.rpc('attach_course_material', {
+        p_course_id: data.courseId,
+        p_title: title,
+        p_storage_path: key,
+        p_file_name: data.file.name,
+        p_description: data.description?.trim() || null,
+        p_week_label: data.weekLabel?.trim() || null,
+        p_mime_type: data.file.type || null,
+        p_size_bytes: data.file.size,
+      }),
+      'The material could not be published.',
+    );
+    const material = camel<CourseMaterial>(row);
+    return envelope({ ...material, uploadedBy: material.uploadedBy ?? { id: userId } });
+  },
+
+  async edit(id: string, data: { title: string; description?: string; weekLabel?: string }) {
+    if (!id) throw new ServiceError('Choose the material to change.');
+    const title = data.title?.trim();
+    if (!title) throw new ServiceError('Give the file a title.');
+
+    const row = unwrap(
+      await supabase
+        .from('course_materials')
+        .update({ title, description: data.description?.trim() || '', week_label: data.weekLabel?.trim() || '' })
+        .eq('id', id)
+        .select(MATERIAL_SELECT)
+        .maybeSingle(),
+      'The material could not be saved.',
+    );
+    // An RLS-filtered update is silent, so the read-back is the only way to know
+    // the caller was allowed to write it at all.
+    if (!row) throw new ServiceError('That material is no longer here.');
+    return envelope(camel(row) as CourseMaterial);
+  },
+
+  /** Takes the stored file with the row, which is what the RPC exists for. */
+  async remove(id: string) {
+    if (!id) throw new ServiceError('Choose the material to remove.');
+    const row = unwrap(
+      await supabase.rpc('remove_course_material', { p_material_id: id }),
+      'The material could not be removed.',
+    );
+    if (!row) throw new ServiceError('That material is no longer here.');
+    return { data: { success: true } };
+  },
+
+  async download(storagePath: string) {
+    if (!storagePath) throw new ServiceError('There is no file to open.');
+    return envelope(await signedDownloadUrl('course-materials', storagePath));
+  },
+};
+
+export const idCardService = {
+  /** The signed-in student's own cards, the live one first. */
+  async mine() {
+    const userId = await getCurrentUserId();
+    const rows = camel(asArray(
+      unwrap(
+        await supabase
+          .from('student_id_cards')
+          .select(ID_CARD_SELECT)
+          .eq('student_id', userId)
+          .order('issued_at', { ascending: false }),
+        'Your ID card could not be loaded.',
+      ),
+    )) as IdCard[];
+    return envelope({ current: rows.find((row) => row.status === 'ISSUED') ?? null, history: rows });
+  },
+
+  /** The office's view of every card in the school, with enough on each row to print it. */
+  async forSchool() {
+    const rows = camel(asArray(
+      unwrap(
+        await supabase
+          .from('student_id_cards')
+          .select(`${ID_CARD_SELECT}, student:profiles!student_id_cards_student_id_fkey(id, first_name, last_name, matric_number, student_level, role, department:departments(name, code, faculty:faculties(name))), tenant:tenants(name)`)
+          .order('issued_at', { ascending: false })
+          .limit(200),
+        'The card register could not be loaded.',
+      ),
+    )) as Array<IdCard & { student?: Record<string, any> | null; tenant?: { name?: string } | null }>;
+    return envelope(rows);
+  },
+
+  /** The card's printed half: whoever holds it needs the school and the person, not the row. */
+  async printData() {
+    const userId = await getCurrentUserId();
+    const [{ data: profile, error }, session] = await Promise.all([
+      supabase
+        .from('profiles')
+        .select('id, first_name, last_name, matric_number, student_level, tenant_id, department:departments(name, code, faculty:faculties(name)), tenant:tenants(name, slug)')
+        .eq('id', userId)
+        .maybeSingle(),
+      supabase.rpc('current_academic_session'),
+    ]);
+    if (error) throw toServiceError(error, 'Your card details could not be loaded.');
+    if (!profile) throw new ServiceError('Your account has no profile yet.');
+
+    const cards = unwrap<any[]>(
+      await supabase
+        .from('student_id_cards')
+        .select(ID_CARD_SELECT)
+        .eq('student_id', userId)
+        .order('issued_at', { ascending: false })
+        .limit(1),
+      'Your ID card could not be loaded.',
+    );
+    return envelope({
+      holder: camel(profile),
+      card: camel(asArray(cards)[0] ?? null) as IdCard | null,
+      session: camel(session.data ?? null) as { label: string; endsAt: string } | null,
+    });
+  },
+
+  /**
+   * A card is issued by the office, never printed by the student, so this is
+   * administrator-only as far as the database is concerned - the page simply gives
+   * them the button.
+   */
+  async issue(data: { studentId: string; photo?: File | null; validUntil?: string | null; sessionLabel?: string }) {
+    if (!data.studentId) throw new ServiceError('Choose the student.');
+
+    let photoPath: string | null = null;
+    if (data.photo) {
+      // 0017 insists the photo lives in this student's own folder.
+      photoPath = `${data.studentId}/photo-${fileStamp()}-${storageSafeName(data.photo.name)}`;
+      await uploadPrivateFile('id-card-photos', photoPath, data.photo, 5);
+    }
+
+    const row = unwrap(
+      await supabase.rpc('issue_student_id_card', {
+        p_student_id: data.studentId,
+        p_photo_path: photoPath,
+        p_valid_until: data.validUntil || null,
+        p_session_label: data.sessionLabel?.trim() || null,
+      }),
+      'The ID card could not be issued.',
+    );
+    return envelope(camel(row) as IdCard);
+  },
+
+  async revoke(cardId: string, reason?: string) {
+    if (!cardId) throw new ServiceError('Choose the card to withdraw.');
+    const row = unwrap(
+      await supabase.rpc('revoke_student_id_card', { p_card_id: cardId, p_reason: reason?.trim() || null }),
+      'The card could not be withdrawn.',
+    );
+    return envelope(camel(row) as IdCard);
+  },
+
+  async verify(code: string) {
+    const trimmed = code?.trim().toUpperCase();
+    if (!/^[0-9A-F]{8}$/.test(trimmed ?? '')) {
+      throw new ServiceError('A card number is the eight characters printed under the name.');
+    }
+    const result = camel<Record<string, any>>(
+      unwrap<Record<string, any>>(
+        await supabase.rpc('verify_id_card', { p_code: trimmed }),
+        'That card number could not be checked.',
+      ),
+    );
+    if (!result) throw new ServiceError('No card from this school carries that number.');
+    return envelope(result);
+  },
+
+  async downloadPhoto(photoPath: string) {
+    if (!photoPath) throw new ServiceError('This card has no photo.');
+    return envelope(await signedDownloadUrl('id-card-photos', photoPath));
   },
 };
 

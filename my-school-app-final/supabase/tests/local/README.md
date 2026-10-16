@@ -22,7 +22,7 @@ sh supabase/tests/local/apply.sh
 ```
 
 `apply.sh` exits non-zero on the first failed statement and prints the step's own output
-when it has something to say, including the final `assertions: 49 failed: 0`. Re-running it
+when it has something to say, including the final `assertions: 402 failed: 0`. Re-running it
 recreates the `sbcheck` database from scratch, so fixtures stay deterministic.
 
 `0002`-`0005` are then applied a **second** time, deliberately: re-running must be a no-op,
@@ -36,7 +36,7 @@ fail loudly rather than be papered over.
 | --- | --- |
 | `00_supabase_shim.sql` | auth / storage / roles / `request.jwt.claims` |
 | `10_fixtures.sql` | two schools, one admin, one teacher, one student per side, plus courses, sections, grades, an invoice and a stored object |
-| `20_rls_tests.sql` | persona assertions: provisioning, first-admin bootstrap, tenant isolation, grading rights, fee rollups, branding storage, analytics |
+| `20_rls_tests.sql` | persona assertions: provisioning, first-admin bootstrap, tenant isolation, grading rights, fee rollups, branding storage, analytics, assignments and submissions, course materials, ID cards |
 
 Assertions run as `authenticated` or `anon` with a forged JWT claim, through
 `SECURITY INVOKER` helpers - a definer helper would execute as its owner and every RLS check

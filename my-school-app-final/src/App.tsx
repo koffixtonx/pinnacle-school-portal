@@ -31,6 +31,11 @@ const CourseRegistrationReview = React.lazy(() => import('./pages/CourseRegistra
 const Announcements = React.lazy(() => import('./pages/Announcements'));
 const AnnouncementReview = React.lazy(() => import('./pages/AnnouncementReview'));
 const Results = React.lazy(() => import('./pages/Results'));
+const Assignments = React.lazy(() => import('./pages/Assignments'));
+const AssignmentReview = React.lazy(() => import('./pages/AssignmentReview'));
+const Materials = React.lazy(() => import('./pages/Materials'));
+const IdCard = React.lazy(() => import('./pages/IdCard'));
+const AuditLog = React.lazy(() => import('./pages/AuditLog'));
 const ForgotPassword = React.lazy(() => import('./pages/ForgotPassword'));
 const ResetPassword = React.lazy(() => import('./pages/ResetPassword'));
 const VerifyTotp = React.lazy(() => import('./pages/VerifyTotp'));
@@ -268,6 +273,41 @@ function App() {
                   </ProtectedRoute>
                 }
               />
+              <Route
+                path="/assignments"
+                element={
+                  <ProtectedRoute roles={['SUPER_ADMIN', 'SCHOOL_ADMIN', 'TEACHER', 'STUDENT']}>
+                    <Assignments />
+                  </ProtectedRoute>
+                }
+              />
+              <Route
+                path="/assignment-review"
+                element={
+                  <ProtectedRoute roles={['SUPER_ADMIN', 'SCHOOL_ADMIN', 'TEACHER']}>
+                    <AssignmentReview />
+                  </ProtectedRoute>
+                }
+              />
+              <Route
+                path="/materials"
+                element={
+                  <ProtectedRoute roles={['SUPER_ADMIN', 'SCHOOL_ADMIN', 'TEACHER', 'STUDENT']}>
+                    <Materials />
+                  </ProtectedRoute>
+                }
+              />
+              {/* A card is held by a student or an office member and issued by the
+                  office; a lecturer has neither job here, and the page has nothing to
+                  show them. */}
+              <Route
+                path="/id-card"
+                element={
+                  <ProtectedRoute roles={['SUPER_ADMIN', 'SCHOOL_ADMIN', 'STUDENT', 'NON_ACADEMIC_STAFF']}>
+                    <IdCard />
+                  </ProtectedRoute>
+                }
+              />
               {/* Every signed-in person has an audience of their own, parents
                   included, so the feed is open to the whole portal. */}
               <Route path="/announcements" element={<Announcements />} />
@@ -276,6 +316,17 @@ function App() {
                 element={
                   <ProtectedRoute roles={['SUPER_ADMIN', 'SCHOOL_ADMIN']}>
                     <AnnouncementReview />
+                  </ProtectedRoute>
+                }
+              />
+              {/* audit_logs_read (0003) hands the trail to a school's own
+                  administrators, so a teacher routed here would get an empty
+                  page rather than an answer. */}
+              <Route
+                path="/audit-log"
+                element={
+                  <ProtectedRoute roles={['SUPER_ADMIN', 'SCHOOL_ADMIN']}>
+                    <AuditLog />
                   </ProtectedRoute>
                 }
               />
